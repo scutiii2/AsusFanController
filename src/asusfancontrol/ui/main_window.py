@@ -148,8 +148,23 @@ class MainWindow(QMainWindow):
         self.settings_panel.start_with_windows_toggled.connect(self._on_start_with_windows_toggled)
         self.settings_panel.poll_interval_changed.connect(c.set_poll_interval)
 
-        self.settings_panel.set_values(c.config.start_with_windows, c.config.poll_interval_ms)
+        self._sync_start_with_windows_checkbox()
         self.curve_editor.set_points(c.config.curve_points)
+
+    def _sync_start_with_windows_checkbox(self) -> None:
+        # config.json only records what we last asked for, not reality — the
+        # task could since have been removed (or added) outside the app, via
+        # remove_startup_task.bat/add_startup_task.bat or the Task Scheduler
+        # GUI directly. Reconcile against the actual registration on launch.
+        try:
+            actually_registered = autostart.is_registered()
+        except Exception:  # noqa: BLE001 - a failed check shouldn't block startup
+            actually_registered = self.controller.config.start_with_windows
+
+        if actually_registered != self.controller.config.start_with_windows:
+            self.controller.set_start_with_windows(actually_registered)
+
+        self.settings_panel.set_values(actually_registered, self.controller.config.poll_interval_ms)
 
     def _on_fans_ready(self, fan_count: int) -> None:
         self._rebuild_fan_gauges(fan_count)
