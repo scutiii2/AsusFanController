@@ -15,8 +15,9 @@ def main() -> int:
 
     import time
 
+    from PySide6.QtCore import QSharedMemory
     from PySide6.QtGui import QIcon
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QMessageBox
 
     from .app_controller import AppController
     from .paths import assets_dir
@@ -26,6 +27,22 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setWindowIcon(QIcon(str(assets_dir() / "fan.png")))
+
+    # Single-instance guard: closing the window minimizes to tray rather
+    # than quitting, so it's easy to end up with a stray background
+    # instance. A second launch would then issue its own, possibly
+    # conflicting, fan-speed commands alongside it. Kept alive for the
+    # whole process lifetime (module-level attribute on app) — its OS-level
+    # segment is released automatically when this process exits.
+    single_instance_lock = QSharedMemory("AsusFanControlUI-single-instance-9f3a2b1c")
+    if not single_instance_lock.create(1):
+        QMessageBox.information(
+            None,
+            "ASUS FAN CONTROLLER",
+            "ASUS Fan Controller is already running — check your system tray.",
+        )
+        return 0
+    app.single_instance_lock = single_instance_lock
 
     splash = SplashScreen()
     splash.show()
