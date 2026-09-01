@@ -88,9 +88,14 @@ description, so this uses the `ScheduledTasks` module instead):
 
 ```powershell
 # register
+# (use the actual logged-on user here, not $env:USERNAME — if this is run
+# from a SYSTEM-elevated context, as the app itself does, $env:USERNAME
+# won't resolve to a valid account and Register-ScheduledTask will fail
+# with "No mapping between account names and security IDs was done")
+$UserName = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
 $Action = New-ScheduledTaskAction -Execute "C:\path\to\AsusFanControlUI.exe"
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
-$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest
+$Principal = New-ScheduledTaskPrincipal -UserId $UserName -RunLevel Highest
 Register-ScheduledTask -TaskName "_ZAsusFanController" -Action $Action -Trigger $Trigger `
   -Principal $Principal -Description "Launches ASUS Fan Controller, already elevated, at logon." -Force
 

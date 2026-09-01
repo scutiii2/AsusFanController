@@ -17,7 +17,7 @@ if not exist "%EXE_PATH%" (
     exit /b 1
 )
 
-powershell -NoProfile -NonInteractive -Command "$Action = New-ScheduledTaskAction -Execute '%EXE_PATH%'; $Trigger = New-ScheduledTaskTrigger -AtLogOn; $Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest; Register-ScheduledTask -TaskName '_ZAsusFanController' -Action $Action -Trigger $Trigger -Principal $Principal -Description 'Launches ASUS Fan Controller, already elevated, at logon.' -Force | Out-Null"
+powershell -NoProfile -NonInteractive -Command "$UserName = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName; $Action = New-ScheduledTaskAction -Execute '%EXE_PATH%'; $Trigger = New-ScheduledTaskTrigger -AtLogOn; $Principal = New-ScheduledTaskPrincipal -UserId $UserName -RunLevel Highest; Register-ScheduledTask -TaskName '_ZAsusFanController' -Action $Action -Trigger $Trigger -Principal $Principal -Description 'Launches ASUS Fan Controller, already elevated, at logon.' -Force | Out-Null"
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to create the startup task.
