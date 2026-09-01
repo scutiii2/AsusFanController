@@ -71,23 +71,34 @@ The easiest way: open the app, go to **Settings** in the sidebar, and check
 
 This does *not* use a Startup-folder shortcut or a registry Run key — those
 would trigger a fresh UAC prompt every single login, since this app
-self-elevates on launch. Instead it registers a **Task Scheduler** task
-(`AsusFanControlUI`) set to run at logon with the highest privileges, so it
+self-elevates on launch. Instead it registers a **Task Scheduler** task named
+`_ZAsusFanController`, set to run at logon with the highest privileges, so it
 launches already elevated with no prompt. See
 [`autostart.py`](src/asusfancontrol/autostart.py).
 
-To do the same thing manually (or to verify/remove it), from an elevated
-prompt:
+You can also add or remove that task without opening the app at all, using
+[`add_startup_task.bat`](add_startup_task.bat) / [`remove_startup_task.bat`](remove_startup_task.bat)
+(both prompt for elevation, then register/unregister the same
+`_ZAsusFanController` task — `add_startup_task.bat` expects the exe to
+already be built at `dist\AsusFanControlUI.exe`).
 
-```bash
-:: register
-schtasks /Create /TN AsusFanControlUI /TR "C:\path\to\AsusFanControlUI.exe" /SC ONLOGON /RL HIGHEST /F
+Or do it manually, from an elevated PowerShell prompt (this is what the app
+and the .bat files actually run — `schtasks /Create` has no way to set a
+description, so this uses the `ScheduledTasks` module instead):
 
-:: check it's there
-schtasks /Query /TN AsusFanControlUI
+```powershell
+# register
+$Action = New-ScheduledTaskAction -Execute "C:\path\to\AsusFanControlUI.exe"
+$Trigger = New-ScheduledTaskTrigger -AtLogOn
+$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest
+Register-ScheduledTask -TaskName "_ZAsusFanController" -Action $Action -Trigger $Trigger `
+  -Principal $Principal -Description "Launches ASUS Fan Controller, already elevated, at logon." -Force
 
-:: remove it
-schtasks /Delete /TN AsusFanControlUI /F
+# check it's there
+Get-ScheduledTask -TaskName "_ZAsusFanController"
+
+# remove it
+Unregister-ScheduledTask -TaskName "_ZAsusFanController" -Confirm:$false
 ```
 
 ## Project layout
@@ -104,4 +115,6 @@ src/asusfancontrol/
   config.py        JSON persistence (%APPDATA%\AsusFanControlUI\config.json)
 tests/             unit tests for curve math, config persistence, CLI-output parsing
 docs/superpowers/specs/  design notes from planning this project
+add_startup_task.bat     registers the _ZAsusFanController startup task
+remove_startup_task.bat  removes it
 ```
