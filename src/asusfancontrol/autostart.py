@@ -46,9 +46,16 @@ def is_registered() -> bool:
 def register() -> None:
     exe = _target_exe()
     script = (
+        # $env:USERNAME is wrong here: this whole app runs as SYSTEM (via
+        # the elevation chain), and SYSTEM's own $env:USERNAME does not
+        # resolve to a valid account SID for New-ScheduledTaskPrincipal
+        # ("No mapping between account names and security IDs was done").
+        # Win32_ComputerSystem.UserName reports the actual interactively
+        # logged-on user regardless of what account is doing the querying.
+        "$UserName = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName; "
         f"$Action = New-ScheduledTaskAction -Execute {_ps_literal(exe)}; "
         "$Trigger = New-ScheduledTaskTrigger -AtLogOn; "
-        "$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest; "
+        "$Principal = New-ScheduledTaskPrincipal -UserId $UserName -RunLevel Highest; "
         f"Register-ScheduledTask -TaskName {_ps_literal(TASK_NAME)} -Action $Action "
         f"-Trigger $Trigger -Principal $Principal -Description {_ps_literal(TASK_DESCRIPTION)} "
         "-Force | Out-Null"
