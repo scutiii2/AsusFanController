@@ -1,0 +1,4 @@
+-r requirements.txt
+mypy==2.3.1
+PySide6-stubs==6.7.3.0
+ruff==0.16.8
