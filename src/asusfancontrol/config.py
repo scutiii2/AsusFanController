@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -55,20 +55,23 @@ def load_config(path: Path) -> AppConfig:
     if not isinstance(data, dict):
         return defaults
 
-    presets = [
-        Preset(
-            name=p["name"],
-            speeds={int(k): v for k, v in p["speeds"].items()},
-            builtin=p.get("builtin", False),
-        )
-        for p in data.get("presets", [])
-    ]
-    curve_points = [(t, s) for t, s in data.get("curve_points", defaults.curve_points)]
+    try:
+        presets = [
+            Preset(
+                name=p["name"],
+                speeds={int(k): v for k, v in p["speeds"].items()},
+                builtin=p.get("builtin", False),
+            )
+            for p in data.get("presets", [])
+        ]
+        curve_points = [(t, s) for t, s in data.get("curve_points", defaults.curve_points)]
 
-    return AppConfig(
-        presets=presets,
-        curve_points=curve_points,
-        last_mode=data.get("last_mode", defaults.last_mode),
-        poll_interval_ms=data.get("poll_interval_ms", defaults.poll_interval_ms),
-        start_with_windows=data.get("start_with_windows", defaults.start_with_windows),
-    )
+        return AppConfig(
+            presets=presets,
+            curve_points=curve_points,
+            last_mode=data.get("last_mode", defaults.last_mode),
+            poll_interval_ms=data.get("poll_interval_ms", defaults.poll_interval_ms),
+            start_with_windows=data.get("start_with_windows", defaults.start_with_windows),
+        )
+    except (KeyError, TypeError, ValueError):
+        return defaults

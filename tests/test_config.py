@@ -71,3 +71,9 @@ class TestConfigLoadFallback:
         loaded = load_config(path)
         assert loaded.poll_interval_ms == 9000
         assert loaded.presets == []
+
+    def test_malformed_preset_entry_falls_back_to_defaults(self, tmp_path):
+        path = tmp_path / "config.json"
+        path.write_text(json.dumps({"presets": [{"name": "Broken"}]}), encoding="utf-8")
+        loaded = load_config(path)
+        assert loaded == AppConfig.default()
