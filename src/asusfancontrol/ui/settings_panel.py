@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QFormLayout, QSpinBox, QWidget
 
+from .qt_utils import block_signals
+
 
 class SettingsPanel(QWidget):
     start_with_windows_toggled = Signal(bool)
@@ -26,10 +28,8 @@ class SettingsPanel(QWidget):
         layout.addRow("Poll interval", self._poll_interval)
 
     def set_values(self, start_with_windows: bool, poll_interval_ms: int) -> None:
-        self._start_with_windows.blockSignals(True)
-        self._start_with_windows.setChecked(start_with_windows)
-        self._start_with_windows.blockSignals(False)
+        with block_signals(self._start_with_windows):
+            self._start_with_windows.setChecked(start_with_windows)
 
-        self._poll_interval.blockSignals(True)
-        self._poll_interval.setValue(poll_interval_ms)
-        self._poll_interval.blockSignals(False)
+        with block_signals(self._poll_interval):
+            self._poll_interval.setValue(poll_interval_ms)

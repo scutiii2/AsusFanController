@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFormLayout, QLabel, QSlider, QWidget
 
+from .qt_utils import block_signals
+
 
 class ManualPanel(QWidget):
     speed_changed = Signal(int, int)  # fan_id, pct
@@ -52,7 +54,6 @@ class ManualPanel(QWidget):
         for fan_id, pct in speeds.items():
             slider = self._sliders.get(fan_id)
             if slider is not None:
-                slider.blockSignals(True)
-                slider.setValue(pct)
-                slider.blockSignals(False)
+                with block_signals(slider):
+                    slider.setValue(pct)
                 self._value_labels[fan_id].setText(f"{pct}%")
