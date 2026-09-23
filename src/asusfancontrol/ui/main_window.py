@@ -121,6 +121,18 @@ class MainWindow(QMainWindow):
         root.addWidget(content, stretch=1)
         self.setCentralWidget(central)
 
+        # Single source of truth for "which panel does this mode show" —
+        # was previously duplicated (and drifting slightly) across
+        # _sync_stack_and_sidebar_to_mode, _on_mode_changed, and
+        # _on_mode_selected. Manual mode has no fixed sidebar id (it
+        # highlights whichever preset is active, or none), so it maps to
+        # None there rather than a real id.
+        self._mode_panels: dict[str, tuple[QWidget, str | None]] = {
+            MODE_AUTOMATIC: (self.automatic_panel, MODE_AUTO_ID),
+            MODE_CUSTOM: (self.curve_editor, MODE_CUSTOM_ID),
+            MODE_MANUAL: (self.manual_panel, None),
+        }
+
     def _rebuild_fan_gauges(self, fan_count: int) -> None:
         for gauge in self.fan_gauges:
             wrapper = cast(QWidget, gauge.parent())
@@ -183,17 +195,12 @@ class MainWindow(QMainWindow):
         self._sync_stack_and_sidebar_to_mode()
 
     def _sync_stack_and_sidebar_to_mode(self) -> None:
-        mode = self.controller.mode
-        if mode == MODE_CUSTOM:
-            self.stack.setCurrentWidget(self.curve_editor)
-            self.sidebar.set_active(MODE_CUSTOM_ID)
-        elif mode == MODE_AUTOMATIC:
-            self.stack.setCurrentWidget(self.automatic_panel)
-            self.sidebar.set_active(MODE_AUTO_ID)
-        else:
-            self.stack.setCurrentWidget(self.manual_panel)
-            if self.controller.active_preset_name:
-                self.sidebar.set_active(self.controller.active_preset_name)
+        widget, sidebar_id = self._mode_panels[self.controller.mode]
+        self.stack.setCurrentWidget(widget)
+        if sidebar_id is not None:
+            self.sidebar.set_active(sidebar_id)
+        elif self.controller.active_preset_name:
+            self.sidebar.set_active(self.controller.active_preset_name)
 
     def _on_readings_updated(self, temp: int, speeds: list[int], commanded: dict[int, int]) -> None:
         self.temp_gauge.set_reading(temp, f"{temp}°C")
@@ -222,30 +229,21 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "ASUS FAN CONTROLLER", message)
 
     def _on_mode_changed(self, mode: str) -> None:
-        if mode == MODE_CUSTOM:
-            self.stack.setCurrentWidget(self.curve_editor)
-        elif mode == MODE_AUTOMATIC:
-            self.stack.setCurrentWidget(self.automatic_panel)
-        elif mode == MODE_MANUAL:
-            self.stack.setCurrentWidget(self.manual_panel)
+        widget, _sidebar_id = self._mode_panels[mode]
+        self.stack.setCurrentWidget(widget)
 
     def _on_mode_selected(self, opt_id: str) -> None:
         if opt_id == MODE_AUTO_ID:
             self.controller.set_automatic()
-            self.stack.setCurrentWidget(self.automatic_panel)
-            self.sidebar.set_active(MODE_AUTO_ID)
-            return
-        if opt_id == MODE_CUSTOM_ID:
+        elif opt_id == MODE_CUSTOM_ID:
             self.controller.set_custom_curve_mode()
-            self.stack.setCurrentWidget(self.curve_editor)
-            self.sidebar.set_active(MODE_CUSTOM_ID)
-            return
-        preset = next((p for p in self.controller.all_presets() if p.name == opt_id), None)
-        if preset is not None:
+        else:
+            preset = next((p for p in self.controller.all_presets() if p.name == opt_id), None)
+            if preset is None:
+                return
             self.controller.apply_preset(preset)
             self.manual_panel.set_speeds(preset.speeds)
-            self.stack.setCurrentWidget(self.manual_panel)
-            self.sidebar.set_active(opt_id)
+        self._sync_stack_and_sidebar_to_mode()
 
     def _on_save_preset(self, name: str) -> None:
         self.controller.save_current_as_preset(name, self.manual_panel.current_speeds())
