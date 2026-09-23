@@ -41,6 +41,13 @@ def app_icon() -> QIcon:
     return QIcon(str(APP_ICON_PATH))
 
 
+def estimate_pct_from_rpm(rpm: int) -> float:
+    """Estimate a fan's speed % from RPM when no commanded % is known
+    (Automatic (Default): the EC controls fans and the CLI has no
+    "get current %" reading)."""
+    return min(rpm / MAX_FAN_RPM * 100, 100)
+
+
 def _card(widget: QWidget) -> QFrame:
     frame = QFrame()
     frame.setObjectName("Card")
@@ -203,9 +210,7 @@ class MainWindow(QMainWindow):
             commanded_pct = commanded.get(fan_id)
             pct: float
             if commanded_pct is None:
-                # Automatic (Default): the EC controls fans and the CLI has
-                # no "get current %" reading, so estimate from RPM instead.
-                pct = min(rpm / MAX_FAN_RPM * 100, 100)
+                pct = estimate_pct_from_rpm(rpm)
             else:
                 pct = commanded_pct
             gauge.set_reading(pct, f"{pct:.0f}%", f"{rpm} RPM")
