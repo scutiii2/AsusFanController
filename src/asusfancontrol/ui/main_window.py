@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QFrame,
@@ -114,8 +116,9 @@ class MainWindow(QMainWindow):
 
     def _rebuild_fan_gauges(self, fan_count: int) -> None:
         for gauge in self.fan_gauges:
-            self._gauges_row.removeWidget(gauge.parent())
-            gauge.parent().deleteLater()
+            wrapper = cast(QWidget, gauge.parent())
+            self._gauges_row.removeWidget(wrapper)
+            wrapper.deleteLater()
         self.fan_gauges = []
         for i in range(fan_count):
             gauge = Gauge(_fan_label(i, fan_count), 100)
@@ -192,13 +195,19 @@ class MainWindow(QMainWindow):
         # of waiting for a poll round-trip through the controller.
         if self.controller.mode == MODE_MANUAL:
             commanded = self.manual_panel.current_speeds()
-        graph_pcts = []
-        for fan_id, (gauge, rpm) in enumerate(zip(self.fan_gauges, speeds)):
-            pct = commanded.get(fan_id)
-            if pct is None:
+        graph_pcts: list[float] = []
+        # Not strict: fan_count (and so len(fan_gauges)) can change between a
+        # gauge rebuild and a reading emitted from the worker thread just
+        # before it — truncating that one frame beats crashing on the race.
+        for fan_id, (gauge, rpm) in enumerate(zip(self.fan_gauges, speeds, strict=False)):
+            commanded_pct = commanded.get(fan_id)
+            pct: float
+            if commanded_pct is None:
                 # Automatic (Default): the EC controls fans and the CLI has
                 # no "get current %" reading, so estimate from RPM instead.
                 pct = min(rpm / MAX_FAN_RPM * 100, 100)
+            else:
+                pct = commanded_pct
             gauge.set_reading(pct, f"{pct:.0f}%", f"{rpm} RPM")
             graph_pcts.append(pct)
         avg_pct = sum(graph_pcts) / len(graph_pcts) if graph_pcts else 0

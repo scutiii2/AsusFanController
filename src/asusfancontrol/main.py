@@ -32,8 +32,9 @@ def main() -> int:
     # than quitting, so it's easy to end up with a stray background
     # instance. A second launch would then issue its own, possibly
     # conflicting, fan-speed commands alongside it. Kept alive for the
-    # whole process lifetime (module-level attribute on app) — its OS-level
-    # segment is released automatically when this process exits.
+    # whole process lifetime as a local (main() doesn't return until
+    # app.exec() finishes) — its OS-level segment is released automatically
+    # when this process exits.
     single_instance_lock = QSharedMemory("AsusFanControlUI-single-instance-9f3a2b1c")
     if not single_instance_lock.create(1):
         QMessageBox.information(
@@ -42,7 +43,6 @@ def main() -> int:
             "ASUS Fan Controller is already running — check your system tray.",
         )
         return 0
-    app.single_instance_lock = single_instance_lock
 
     splash = SplashScreen()
     splash.show()

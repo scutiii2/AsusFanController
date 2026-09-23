@@ -21,7 +21,7 @@ class FanCurve:
         if temp >= points[-1][0]:
             return points[-1][1]
 
-        for (t1, s1), (t2, s2) in zip(points, points[1:]):
+        for (t1, s1), (t2, s2) in zip(points, points[1:], strict=True):
             if t1 <= temp <= t2:
                 if t1 == t2:
                     return s2
