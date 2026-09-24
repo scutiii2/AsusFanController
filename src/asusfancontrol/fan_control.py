@@ -7,10 +7,22 @@ subprocess-calling wrapper (only exercisable on real hardware).
 
 from __future__ import annotations
 
+import glob
 import re
+import shutil
 import subprocess
 
 from .paths import assets_dir
+
+# AsusWinIO64.dll is (c) ASUSTeK and not ours to redistribute, so it is not
+# bundled. MyASUS (the ASUS System Control Interface) installs it in the driver
+# store; the CLI loads it from its own directory, so copy it in beside the exe
+# on first use. Same file the CLI's upstream README points at.
+_DRIVER_DLL_NAME = "AsusWinIO64.dll"
+_DRIVER_STORE_GLOB = (
+    r"C:\Windows\System32\DriverStore\FileRepository"
+    r"\asussci2.inf_amd64_*\ASUSSystemAnalysis\AsusWinIO64.dll"
+)
 
 
 class FanControlError(Exception):
@@ -19,6 +31,24 @@ class FanControlError(Exception):
 
 def _exe_path():
     return assets_dir() / "AsusFanControl.exe"
+
+
+def ensure_driver_library() -> None:
+    """Copy AsusWinIO64.dll next to the CLI if it isn't there yet.
+
+    Raises FanControlError if MyASUS isn't installed, so it can't be found.
+    """
+    target = assets_dir() / _DRIVER_DLL_NAME
+    if target.exists():
+        return
+    matches = sorted(glob.glob(_DRIVER_STORE_GLOB))
+    if not matches:
+        raise FanControlError(
+            f"{_DRIVER_DLL_NAME} not found in the driver store. Install MyASUS "
+            "(the ASUS System Control Interface) so the fan driver is available."
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(matches[0], target)
 
 
 def parse_fan_count(output: str) -> int:

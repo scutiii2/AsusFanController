@@ -23,3 +23,6 @@ dist/
 # OS
 Thumbs.db
 .DS_Store
+
+# Copied from the ASUS driver store at runtime, not redistributed.
+src/asusfancontrol/assets/AsusWinIO64.dll

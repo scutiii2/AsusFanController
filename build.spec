@@ -10,8 +10,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ("src/asusfancontrol/assets/AsusFanControl.exe", "asusfancontrol/assets"),
-        ("src/asusfancontrol/assets/AsusWinIO64.dll", "asusfancontrol/assets"),
-        ("src/asusfancontrol/assets/PsExec.exe", "asusfancontrol/assets"),
+        # AsusWinIO64.dll is not bundled (ASUS-owned); it is copied from the
+        # driver store at startup by fan_control.ensure_driver_library().
         ("src/asusfancontrol/assets/fan.png", "asusfancontrol/assets"),
     ],
     hiddenimports=[],

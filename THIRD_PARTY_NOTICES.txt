@@ -1,0 +1,42 @@
+Third-party components bundled with ASUS Fan Controller
+=======================================================
+
+AsusFanControl.exe below is bundled in src/asusfancontrol/assets and embedded
+in the built AsusFanControlUI.exe. AsusWinIO64.dll is NOT bundled; it is copied
+from the local ASUS driver store at runtime. Each remains under its owner's terms.
+
+
+AsusFanControl.exe
+------------------
+From https://github.com/Karmel0x/AsusFanControl, used unmodified.
+
+MIT License
+
+Copyright (c) 2023 Karmel0x
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+AsusWinIO64.dll (not bundled — used at runtime)
+-----------------------------------------------
+(c) ASUSTeK COMPUTER INC. Not covered by the MIT license above, and not
+redistributed with this software. The MyASUS app (ASUS System Control
+Interface) installs it under
+C:\Windows\System32\DriverStore\FileRepository\asussci2.inf_amd64_*\ASUSSystemAnalysis\
+and the app copies it from there at startup.

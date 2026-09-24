@@ -1,9 +1,12 @@
-"""Self-elevation: plain user -> Administrator (UAC) -> SYSTEM (PsExec).
+"""Self-elevation: plain user -> Administrator (UAC) -> SYSTEM.
 
-Mirrors the existing FanController.bat: a UAC prompt to reach Administrator,
-then PsExec -s to reach SYSTEM, since the EC driver needs SYSTEM and
-Administrator alone is not enough (confirmed by running the CLI
-non-elevated: it returns fan count -1 / temp 0).
+A UAC prompt reaches Administrator, then the app relaunches itself as SYSTEM,
+since the EC driver needs SYSTEM and Administrator alone is not enough: run
+from an elevated Administrator shell, the CLI still returns fan count -1 /
+temp 0, the same as unelevated.
+
+SYSTEM is reached by duplicating a SYSTEM process token (system_launch), the
+same mechanism as PsExec -s -i but without shipping a third-party binary.
 """
 
 from __future__ import annotations
@@ -33,10 +36,11 @@ def is_system() -> bool:
 
 
 def _self_command() -> tuple[str, list[str]]:
-    """Returns (executable, args) to relaunch this program identically."""
+    """Returns (executable, args) to relaunch this program identically,
+    preserving any command-line arguments across the elevation relaunches."""
     if getattr(sys, "frozen", False):
-        return sys.executable, []
-    return sys.executable, [str(Path(sys.argv[0]).resolve())]
+        return sys.executable, list(sys.argv[1:])
+    return sys.executable, [str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
 
 
 def relaunch_as_admin() -> None:
@@ -45,24 +49,36 @@ def relaunch_as_admin() -> None:
     ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 1)
 
 
-def relaunch_as_system() -> None:
-    from .paths import assets_dir
-
-    psexec = assets_dir() / "PsExec.exe"
+def _command_line() -> str:
     exe, args = _self_command()
-    subprocess.Popen(
-        [str(psexec), "-accepteula", "-i", "-s", "-d", exe, *args],
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+    return " ".join(f'"{part}"' for part in (exe, *args))
+
+
+def relaunch_as_system() -> None:
+    """Relaunch this program as SYSTEM. Raises SystemLaunchError on failure."""
+    from . import system_launch
+
+    system_launch.launch_as_system(_command_line())
 
 
 def ensure_system_elevated() -> bool:
     """Returns True if already SYSTEM. Otherwise relaunches and returns False
     so the caller can exit the current (non-SYSTEM) process."""
+    from . import system_launch
+
     if is_system():
         return True
     if not is_admin():
         relaunch_as_admin()
-    else:
+        return False
+    try:
         relaunch_as_system()
+    except system_launch.SystemLaunchError as exc:
+        # No QApplication exists yet, so use a native dialog.
+        ctypes.windll.user32.MessageBoxW(
+            None,
+            f"Could not relaunch with SYSTEM privileges, which the fan driver requires:\n\n{exc}",
+            "ASUS FAN CONTROLLER",
+            0x10,  # MB_ICONERROR
+        )
     return False
