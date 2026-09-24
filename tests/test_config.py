@@ -1,4 +1,7 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from asusfancontrol.config import AppConfig, Mode, Preset, load_config, save_config
 
@@ -51,6 +54,33 @@ class TestConfigRoundTrip:
         assert loaded.poll_interval_ms == 5000
         assert loaded.start_with_windows is True
         assert loaded.last_mode == "custom"
+
+
+class TestConfigSaveIsAtomic:
+    def test_crash_mid_write_keeps_the_previous_config(self, tmp_path, monkeypatch):
+        path = tmp_path / "config.json"
+        original = AppConfig.default()
+        original.presets.append(Preset(name="Desk", speeds={0: 40}))
+        save_config(path, original)
+
+        real_write_text = Path.write_text
+
+        def write_half_then_crash(self, data, *args, **kwargs):
+            real_write_text(self, data[: len(data) // 2], *args, **kwargs)
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "write_text", write_half_then_crash)
+        changed = AppConfig.default()
+        changed.poll_interval_ms = 9000
+        with pytest.raises(OSError):
+            save_config(path, changed)
+        monkeypatch.undo()
+
+        assert load_config(path).presets == [Preset(name="Desk", speeds={0: 40})]
+
+    def test_save_leaves_no_temp_file_behind(self, tmp_path):
+        save_config(tmp_path / "config.json", AppConfig.default())
+        assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
 
 
 class TestConfigLoadFallback:

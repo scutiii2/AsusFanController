@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -55,7 +56,12 @@ def save_config(path: Path, config: AppConfig) -> None:
         "poll_interval_ms": config.poll_interval_ms,
         "start_with_windows": config.start_with_windows,
     }
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # Write beside the target, then swap it in: a crash mid-write leaves only
+    # a stray temp file, never a truncated config.json that load_config would
+    # discard (taking the user's presets with it).
+    tmp_path = path.with_name(path.name + ".tmp")
+    tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    os.replace(tmp_path, path)
 
 
 def load_config(path: Path) -> AppConfig:
