@@ -4,7 +4,23 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
+
+
+class Mode(StrEnum):
+    AUTOMATIC = "automatic"
+    CUSTOM = "custom"
+    MANUAL = "manual"
+
+
+def _parse_mode(value: object, default: Mode) -> Mode:
+    if not isinstance(value, str):
+        return default
+    try:
+        return Mode(value)
+    except ValueError:
+        return default
 
 
 @dataclass
@@ -18,7 +34,7 @@ class Preset:
 class AppConfig:
     presets: list[Preset] = field(default_factory=list)
     curve_points: list[tuple[float, int]] = field(default_factory=lambda: [(40, 20), (60, 50), (80, 100)])
-    last_mode: str = "automatic"
+    last_mode: Mode = Mode.AUTOMATIC
     poll_interval_ms: int = 2000
     start_with_windows: bool = False
 
@@ -35,7 +51,7 @@ def save_config(path: Path, config: AppConfig) -> None:
             for p in config.presets
         ],
         "curve_points": [[t, s] for t, s in config.curve_points],
-        "last_mode": config.last_mode,
+        "last_mode": config.last_mode.value,
         "poll_interval_ms": config.poll_interval_ms,
         "start_with_windows": config.start_with_windows,
     }
@@ -69,7 +85,7 @@ def load_config(path: Path) -> AppConfig:
         return AppConfig(
             presets=presets,
             curve_points=curve_points,
-            last_mode=data.get("last_mode", defaults.last_mode),
+            last_mode=_parse_mode(data.get("last_mode"), defaults.last_mode),
             poll_interval_ms=data.get("poll_interval_ms", defaults.poll_interval_ms),
             start_with_windows=data.get("start_with_windows", defaults.start_with_windows),
         )

@@ -1,6 +1,6 @@
 import json
 
-from asusfancontrol.config import AppConfig, Preset, load_config, save_config
+from asusfancontrol.config import AppConfig, Mode, Preset, load_config, save_config
 
 
 class TestAppConfigDefaults:
@@ -43,7 +43,7 @@ class TestConfigRoundTrip:
         config = AppConfig.default()
         config.poll_interval_ms = 5000
         config.start_with_windows = True
-        config.last_mode = "custom"
+        config.last_mode = Mode.CUSTOM
         save_config(path, config)
 
         loaded = load_config(path)
@@ -71,6 +71,23 @@ class TestConfigLoadFallback:
         loaded = load_config(path)
         assert loaded.poll_interval_ms == 9000
         assert loaded.presets == []
+
+    def test_unknown_last_mode_falls_back_to_automatic_and_keeps_other_settings(self, tmp_path):
+        path = tmp_path / "config.json"
+        path.write_text(json.dumps({"last_mode": "turbo", "poll_interval_ms": 9000}), encoding="utf-8")
+        loaded = load_config(path)
+        assert loaded.last_mode is Mode.AUTOMATIC
+        assert loaded.poll_interval_ms == 9000
+
+    def test_non_string_last_mode_falls_back_to_automatic(self, tmp_path):
+        path = tmp_path / "config.json"
+        path.write_text(json.dumps({"last_mode": 3}), encoding="utf-8")
+        assert load_config(path).last_mode is Mode.AUTOMATIC
+
+    def test_loaded_last_mode_is_a_mode_not_a_plain_string(self, tmp_path):
+        path = tmp_path / "config.json"
+        path.write_text(json.dumps({"last_mode": "custom"}), encoding="utf-8")
+        assert load_config(path).last_mode is Mode.CUSTOM
 
     def test_malformed_preset_entry_falls_back_to_defaults(self, tmp_path):
         path = tmp_path / "config.json"

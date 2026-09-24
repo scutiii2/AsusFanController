@@ -4,8 +4,8 @@ import pytest
 
 from asusfancontrol import app_controller as app_controller_module
 from asusfancontrol import fan_control
-from asusfancontrol.app_controller import AppController, MODE_AUTOMATIC, MODE_CUSTOM, MODE_MANUAL
-from asusfancontrol.config import Preset
+from asusfancontrol.app_controller import AppController
+from asusfancontrol.config import Mode, Preset
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def controller(qtbot, monkeypatch, tmp_path):
 class TestManualMode:
     def test_set_manual_speed_switches_mode_and_records_commanded_speed(self, controller):
         controller.set_manual_speed(0, 75)
-        assert controller.mode == MODE_MANUAL
+        assert controller.mode == Mode.MANUAL
         assert controller.commanded_speeds[0] == 75
 
     def test_set_manual_speed_clears_active_preset_name(self, controller):
@@ -42,7 +42,7 @@ class TestPresets:
     def test_apply_preset_commands_every_fan_in_it_and_sets_active_name(self, controller):
         preset = Preset(name="Desk", speeds={0: 40, 1: 60}, builtin=False)
         controller.apply_preset(preset)
-        assert controller.mode == MODE_MANUAL
+        assert controller.mode == Mode.MANUAL
         assert controller.active_preset_name == "Desk"
         assert controller.commanded_speeds == {0: 40, 1: 60}
 
@@ -73,7 +73,7 @@ class TestAutomaticMode:
     def test_set_automatic_switches_mode(self, controller):
         controller.set_manual_speed(0, 50)
         controller.set_automatic()
-        assert controller.mode == MODE_AUTOMATIC
+        assert controller.mode == Mode.AUTOMATIC
 
     def test_set_automatic_clears_commanded_speeds(self, controller):
         controller.set_manual_speed(0, 50)
@@ -89,7 +89,7 @@ class TestAutomaticMode:
 class TestCustomCurveMode:
     def test_set_custom_curve_mode_switches_mode(self, controller):
         controller.set_custom_curve_mode()
-        assert controller.mode == MODE_CUSTOM
+        assert controller.mode == Mode.CUSTOM
 
     def test_readings_in_custom_mode_command_fans_from_curve(self, controller):
         controller.set_custom_curve_mode()
@@ -109,10 +109,10 @@ class TestModeChangedSignal:
     @pytest.mark.parametrize(
         ("switch", "expected_mode"),
         [
-            (lambda c: c.set_manual_speed(0, 50), MODE_MANUAL),
-            (lambda c: c.apply_preset(Preset(name="Desk", speeds={0: 40})), MODE_MANUAL),
-            (lambda c: c.set_automatic(), MODE_AUTOMATIC),
-            (lambda c: c.set_custom_curve_mode(), MODE_CUSTOM),
+            (lambda c: c.set_manual_speed(0, 50), Mode.MANUAL),
+            (lambda c: c.apply_preset(Preset(name="Desk", speeds={0: 40})), Mode.MANUAL),
+            (lambda c: c.set_automatic(), Mode.AUTOMATIC),
+            (lambda c: c.set_custom_curve_mode(), Mode.CUSTOM),
         ],
     )
     def test_every_mode_switch_emits_mode_changed_once(self, controller, switch, expected_mode):
@@ -126,7 +126,7 @@ class TestPersistence:
     def test_state_changes_are_persisted_to_config_path(self, controller, tmp_path):
         controller.set_manual_speed(0, 50)
         saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
-        assert saved["last_mode"] == MODE_MANUAL
+        assert saved["last_mode"] == Mode.MANUAL
 
     def test_set_start_with_windows_persists(self, controller, tmp_path):
         controller.set_start_with_windows(True)

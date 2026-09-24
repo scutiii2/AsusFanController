@@ -9,16 +9,12 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal
 
-from .config import AppConfig, Preset, load_config, save_config
+from .config import AppConfig, Mode, Preset, load_config, save_config
 from .curve import CurveController, FanCurve
 from .presets import builtin_presets
 from .worker import FanWorker
 
 CONFIG_PATH = Path.home() / "AppData" / "Roaming" / "AsusFanControlUI" / "config.json"
-
-MODE_AUTOMATIC = "automatic"
-MODE_CUSTOM = "custom"
-MODE_MANUAL = "manual"
 
 
 class AppController(QObject):
@@ -37,7 +33,7 @@ class AppController(QObject):
         super().__init__(parent)
         self.config: AppConfig = load_config(CONFIG_PATH)
         self.fan_count = 0
-        self.mode = self.config.last_mode
+        self.mode: Mode = self.config.last_mode
         self.active_preset_name: str | None = None
         self._curve_controller: CurveController | None = None
         self._rebuild_curve_controller()
@@ -79,12 +75,12 @@ class AppController(QObject):
 
     def set_manual_speed(self, fan_id: int, pct: int) -> None:
         self._command_fan_speed(fan_id, pct)
-        self._switch_mode(MODE_MANUAL)
+        self._switch_mode(Mode.MANUAL)
 
     def apply_preset(self, preset: Preset) -> None:
         for fan_id, pct in preset.speeds.items():
             self._command_fan_speed(fan_id, pct)
-        self._switch_mode(MODE_MANUAL, preset_name=preset.name)
+        self._switch_mode(Mode.MANUAL, preset_name=preset.name)
 
     def save_current_as_preset(self, name: str, speeds: dict[int, int]) -> None:
         self.config.presets = [p for p in self.config.presets if p.name != name]
@@ -98,11 +94,11 @@ class AppController(QObject):
     def set_automatic(self) -> None:
         self.commanded_speeds = {}  # EC takes over; we no longer know the %
         self._request_set_auto.emit()
-        self._switch_mode(MODE_AUTOMATIC)
+        self._switch_mode(Mode.AUTOMATIC)
 
     def set_custom_curve_mode(self) -> None:
         self._rebuild_curve_controller()
-        self._switch_mode(MODE_CUSTOM)
+        self._switch_mode(Mode.CUSTOM)
 
     def set_curve_points(self, points: list[tuple[float, int]]) -> None:
         self.config.curve_points = points
@@ -113,7 +109,7 @@ class AppController(QObject):
         self.config.start_with_windows = enabled
         self._save()
 
-    def _switch_mode(self, mode: str, preset_name: str | None = None) -> None:
+    def _switch_mode(self, mode: Mode, preset_name: str | None = None) -> None:
         self.mode = mode
         self.active_preset_name = preset_name
         self.mode_changed.emit(mode)
@@ -128,7 +124,7 @@ class AppController(QObject):
         self.fans_ready.emit(fan_count)
 
     def _on_worker_readings(self, temp: int, speeds: list[int]) -> None:
-        if self.mode == MODE_CUSTOM and self._curve_controller is not None:
+        if self.mode == Mode.CUSTOM and self._curve_controller is not None:
             target = self._curve_controller.next_speed(temp)
             if target is not None:
                 for fan_id in range(self.fan_count):

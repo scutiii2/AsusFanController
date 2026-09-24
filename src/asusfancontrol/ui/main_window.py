@@ -14,7 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from .. import autostart
-from ..app_controller import AppController, MODE_AUTOMATIC, MODE_CUSTOM, MODE_MANUAL
+from ..app_controller import AppController
+from ..config import Mode
 from ..paths import assets_dir
 from .automatic_panel import AutomaticPanel
 from .curve_editor import CurveEditor
@@ -127,10 +128,10 @@ class MainWindow(QMainWindow):
         # _on_mode_selected. Manual mode has no fixed sidebar id (it
         # highlights whichever preset is active, or none), so it maps to
         # None there rather than a real id.
-        self._mode_panels: dict[str, tuple[QWidget, str | None]] = {
-            MODE_AUTOMATIC: (self.automatic_panel, MODE_AUTO_ID),
-            MODE_CUSTOM: (self.curve_editor, MODE_CUSTOM_ID),
-            MODE_MANUAL: (self.manual_panel, None),
+        self._mode_panels: dict[Mode, tuple[QWidget, str | None]] = {
+            Mode.AUTOMATIC: (self.automatic_panel, MODE_AUTO_ID),
+            Mode.CUSTOM: (self.curve_editor, MODE_CUSTOM_ID),
+            Mode.MANUAL: (self.manual_panel, None),
         }
 
     def _rebuild_fan_gauges(self, fan_count: int) -> None:
@@ -207,7 +208,7 @@ class MainWindow(QMainWindow):
         # In Manual mode, trust the sliders directly — they're what's on
         # screen, and it means a drag shows the right % immediately instead
         # of waiting for a poll round-trip through the controller.
-        if self.controller.mode == MODE_MANUAL:
+        if self.controller.mode == Mode.MANUAL:
             commanded = self.manual_panel.current_speeds()
         graph_pcts: list[float] = []
         # Not strict: fan_count (and so len(fan_gauges)) can change between a
@@ -229,7 +230,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "ASUS FAN CONTROLLER", message)
 
     def _on_mode_changed(self, mode: str) -> None:
-        widget, _sidebar_id = self._mode_panels[mode]
+        widget, _sidebar_id = self._mode_panels[Mode(mode)]
         self.stack.setCurrentWidget(widget)
 
     def _on_mode_selected(self, opt_id: str) -> None:
