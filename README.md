@@ -5,14 +5,25 @@ live temp/RPM gauges, built-in and custom presets, a software fan curve
 ("Automatic (Override)"), and a system tray.
 
 Built on top of [Karmel0x/AsusFanControl](https://github.com/Karmel0x/AsusFanControl) —
-this project wraps its `AsusFanControl.exe` CLI (and the `AsusWinIO64.dll` /
-`PsExec.exe` it depends on) with this UI, elevation flow, presets, and curve
-logic. Those binaries are bundled as-is in [`src/asusfancontrol/assets`](src/asusfancontrol/assets);
-none of that project's code was modified.
+this project wraps its `AsusFanControl.exe` CLI with this UI, elevation flow,
+presets, and curve logic. That CLI is bundled as-is in
+[`src/asusfancontrol/assets`](src/asusfancontrol/assets); none of that project's
+code was modified. Licenses and owners are listed in
+[`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt).
+
+The CLI needs ASUS's `AsusWinIO64.dll`, which is not redistributable, so it is
+not bundled: the app copies it from the local ASUS driver store (installed by
+MyASUS) at startup — see [`fan_control.py`](src/asusfancontrol/fan_control.py).
+
+To reach SYSTEM (which the fan driver requires), the app duplicates a SYSTEM
+process token itself rather than shipping PsExec — see
+[`system_launch.py`](src/asusfancontrol/system_launch.py).
 
 ## Requirements
 
-- Windows (uses `PsExec`, Task Scheduler, and UAC — Windows-only by design)
+- Windows (uses Task Scheduler, UAC, and the Win32 API — Windows-only by design)
+- MyASUS / ASUS System Control Interface installed (provides `AsusWinIO64.dll`
+  and the fan driver; the ASUS System Analysis service must be running)
 - Python 3.11+ to run from source or build the `.exe`
 
 ## Features
@@ -35,9 +46,10 @@ python -m venv .venv
 .venv\Scripts\python run.py
 ```
 
-The app self-elevates on launch (UAC, then `PsExec -s` to reach SYSTEM —
-required for the fan driver to actually respond; see
-[`elevation.py`](src/asusfancontrol/elevation.py)), so expect a UAC prompt.
+The app self-elevates on launch (UAC to reach Administrator, then a token-
+duplication step to reach SYSTEM — required for the fan driver to actually
+respond; see [`elevation.py`](src/asusfancontrol/elevation.py)), so expect a
+UAC prompt.
 
 For UI development without hardware access, skip elevation:
 
@@ -67,6 +79,11 @@ It creates `.venv` if missing, installs `requirements.txt`, runs the tests,
 then runs PyInstaller. Pass `--skip-tests` to skip the test run. Quit the app
 from its tray icon first: a running exe can't be overwritten.
 
+`build.bat` is a thin launcher for [`build.ps1`](build.ps1), which pins the
+current step to a status line at the top of the window and streams the build
+logs below it (falling back to plain output where the console lacks ANSI
+support).
+
 To run PyInstaller directly instead:
 
 ```bash
@@ -74,7 +91,14 @@ To run PyInstaller directly instead:
 ```
 
 Both produce `dist/AsusFanControlUI.exe` — a single-file, windowed, self-elevating
-executable with the CLI/driver/PsExec assets and the app icon embedded.
+executable with the CLI/driver assets and the app icon embedded.
+
+To publish a release, push a version tag. The Release workflow runs the
+tests, builds the exe, and attaches it to a new GitHub Release:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 ## Running this at Windows startup
 
@@ -122,14 +146,15 @@ Unregister-ScheduledTask -TaskName "_ZAsusFanController" -Confirm:$false
 
 ```
 src/asusfancontrol/
-  assets/          bundled AsusFanControl.exe, AsusWinIO64.dll, PsExec.exe, icon
+  assets/          bundled AsusFanControl.exe and icon (AsusWinIO64.dll copied here at runtime)
   ui/              PySide6 widgets (sidebar, gauges, graph, curve editor, tray, splash)
   fan_control.py   the only module that shells out to AsusFanControl.exe
   worker.py        background thread that owns all fan I/O, so the UI never blocks
   app_controller.py  mode/preset/curve state, wired to the UI via Qt signals
   elevation.py     UAC -> SYSTEM self-elevation, mirroring the original FanController.bat
   autostart.py     Task Scheduler registration for "Start with Windows"
-  config.py        JSON persistence (%APPDATA%\AsusFanControlUI\config.json)
+  config.py        JSON persistence (%ProgramData%\AsusFanControlUI\config.json;
+                   %APPDATA%\... when ASUSFANCONTROL_SKIP_ELEVATION=1)
 tests/             unit tests for curve math, config persistence, CLI-output parsing
 docs/superpowers/specs/  design notes from planning this project
 add_startup_task.bat     registers the _ZAsusFanController startup task
