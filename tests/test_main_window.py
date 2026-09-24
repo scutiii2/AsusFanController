@@ -1,4 +1,5 @@
 import pytest
+from PySide6.QtWidgets import QMessageBox
 
 from asusfancontrol import app_controller as app_controller_module
 from asusfancontrol import autostart, fan_control
@@ -66,6 +67,37 @@ class TestStartupPanel:
     def test_saved_mode_shows_its_panel(self, make_window, mode, panel_attr):
         window = make_window(mode)
         assert window.stack.currentWidget() is getattr(window, panel_attr)
+
+
+class TestErrorPopup:
+    def test_repeated_errors_reuse_one_box(self, make_window):
+        window = make_window()
+        for message in ["driver missing", "driver missing", "exit 1"]:
+            window._on_error(message)
+        boxes = window.findChildren(QMessageBox)
+        assert len(boxes) == 1
+        assert boxes[0].text() == "exit 1"
+        assert boxes[0].isVisible()
+
+    def test_same_error_does_not_reopen_after_user_closes_it(self, make_window):
+        window = make_window()
+        window._on_error("driver missing")
+        window._error_box.close()
+        window._on_error("driver missing")
+        assert not window._error_box.isVisible()
+
+    def test_same_error_shows_again_after_a_successful_reading(self, make_window):
+        window = make_window()
+        window._on_error("driver missing")
+        window._error_box.close()
+        window._on_readings_updated(40, [1000, 1000], {})
+        window._on_error("driver missing")
+        assert window._error_box.isVisible()
+
+    def test_error_box_does_not_block(self, make_window):
+        window = make_window()
+        window._on_error("driver missing")
+        assert not window._error_box.isModal()
 
 
 class TestModeSelection:

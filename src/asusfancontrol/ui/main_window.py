@@ -81,6 +81,13 @@ class MainWindow(QMainWindow):
         self.resize(980, 680)
         self.setStyleSheet(STYLESHEET)
 
+        # One reusable, non-blocking box. The worker reports a failure on
+        # every poll, so a fresh modal box per error would pile up one every
+        # poll interval for as long as the CLI keeps failing.
+        self._error_box = QMessageBox(QMessageBox.Icon.Warning, "ASUS FAN CONTROLLER", "", parent=self)
+        self._error_box.setModal(False)
+        self._last_error: str | None = None
+
         self._build_ui()
         self._wire_controller()
 
@@ -208,6 +215,7 @@ class MainWindow(QMainWindow):
             self.sidebar.set_active(self.controller.active_preset_name)
 
     def _on_readings_updated(self, temp: int, speeds: list[int], commanded: dict[int, int]) -> None:
+        self._last_error = None
         self.temp_gauge.set_reading(temp, f"{temp}°C")
         # In Manual mode, trust the sliders directly — they're what's on
         # screen, and it means a drag shows the right % immediately instead
@@ -231,7 +239,13 @@ class MainWindow(QMainWindow):
         self.graph.add_sample(temp, avg_pct)
 
     def _on_error(self, message: str) -> None:
-        QMessageBox.warning(self, "ASUS FAN CONTROLLER", message)
+        # Same failure again: already shown (or dismissed by the user), so
+        # don't reopen it every poll. Cleared by the next good reading.
+        if message == self._last_error:
+            return
+        self._last_error = message
+        self._error_box.setText(message)
+        self._error_box.show()
 
     def _on_mode_changed(self, mode: str) -> None:
         widget, _sidebar_id = self._mode_panels[Mode(mode)]
