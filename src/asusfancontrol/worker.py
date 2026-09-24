@@ -9,11 +9,14 @@ writes never block the UI, however slow the CLI turns out to be.
 
 from __future__ import annotations
 
+from typing import Callable, TypeVar
+
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from . import fan_control
 from .fan_control import FanControlError
 
+T = TypeVar("T")
 
 class FanWorker(QObject):
     readings_ready = Signal(int, list)
@@ -53,32 +56,28 @@ class FanWorker(QObject):
         self._poll()
         QTimer.singleShot(self._interval_ms, self._poll_and_reschedule)
 
-    def _poll(self) -> None:
+    def _run_safely(self, action: str, fn: Callable[[], T]) -> T | None:
+        """Run fn, reporting any failure through `error` instead of raising,
+        so one bad CLI call never kills this thread's event loop."""
         try:
-            temp = fan_control.get_cpu_temp()
-            speeds = fan_control.get_fan_speeds()
+            return fn()
         except FanControlError as exc:
             self.error.emit(str(exc))
-            return
         except Exception as exc:  # noqa: BLE001 - keep the worker loop alive
-            self.error.emit(f"Unexpected error while polling: {exc}")
-            return
-        self.readings_ready.emit(temp, speeds)
+            self.error.emit(f"Unexpected error while {action}: {exc}")
+        return None
+
+    def _poll(self) -> None:
+        readings = self._run_safely(
+            "polling", lambda: (fan_control.get_cpu_temp(), fan_control.get_fan_speeds())
+        )
+        if readings is not None:
+            self.readings_ready.emit(*readings)
 
     @Slot(int, int)
     def set_fan_speed(self, fan_id: int, pct: int) -> None:
-        try:
-            fan_control.set_fan_speed(fan_id, pct)
-        except FanControlError as exc:
-            self.error.emit(str(exc))
-        except Exception as exc:  # noqa: BLE001
-            self.error.emit(f"Unexpected error while setting fan speed: {exc}")
+        self._run_safely("setting fan speed", lambda: fan_control.set_fan_speed(fan_id, pct))
 
     @Slot()
     def set_auto(self) -> None:
-        try:
-            fan_control.set_auto()
-        except FanControlError as exc:
-            self.error.emit(str(exc))
-        except Exception as exc:  # noqa: BLE001
-            self.error.emit(f"Unexpected error while setting automatic mode: {exc}")
+        self._run_safely("setting automatic mode", fan_control.set_auto)
