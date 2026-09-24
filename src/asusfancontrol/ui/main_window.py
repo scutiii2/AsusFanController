@@ -27,8 +27,17 @@ from .sidebar import Sidebar
 from .theme import STYLESHEET
 from .tray import TrayIcon
 
+# Sidebar/tray option ids share a namespace with user preset names, hence the
+# underscores: a preset the user names "custom" must not collide with a mode.
 MODE_AUTO_ID = "__automatic__"
 MODE_CUSTOM_ID = "__custom__"
+
+# Fixed mode entries shown in both the sidebar and the tray menu, in display
+# order. Manual has no entry: it is entered by picking a preset or a slider.
+SELECTABLE_MODES: list[tuple[str, str]] = [
+    (MODE_AUTO_ID, "Automatic (Default)"),
+    (MODE_CUSTOM_ID, "Automatic (Override)"),
+]
 
 # The CLI has no "get current %" reading — only RPM. In Automatic (Default),
 # where nothing is commanded by us, this is the only way to estimate a
@@ -75,9 +84,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._wire_controller()
 
-        self.tray = TrayIcon(
-            self, [(MODE_AUTO_ID, "Automatic (Default)"), (MODE_CUSTOM_ID, "Automatic (Override)")]
-        )
+        self.tray = TrayIcon(self, SELECTABLE_MODES)
         self.tray.mode_requested.connect(self._on_mode_selected)
         self.tray.show()
 
@@ -146,10 +153,7 @@ class MainWindow(QMainWindow):
             self._gauges_row.addWidget(_card(gauge))
 
     def _refresh_sidebar_options(self) -> None:
-        entries = [
-            (MODE_AUTO_ID, "Automatic (Default)", False),
-            (MODE_CUSTOM_ID, "Automatic (Override)", False),
-        ]
+        entries = [(opt_id, label, False) for opt_id, label in SELECTABLE_MODES]
         for preset in self.controller.all_presets():
             entries.append((preset.name, preset.name, not preset.builtin))
         self.sidebar.set_options(entries)
