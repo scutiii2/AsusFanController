@@ -8,13 +8,18 @@ on:
 jobs:
   pytest:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported (README says 3.11+) and the version used for development.
+        python-version: ["3.11", "3.14"]
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest
       - run: ruff check .
