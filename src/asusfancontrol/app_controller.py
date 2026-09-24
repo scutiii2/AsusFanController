@@ -78,19 +78,13 @@ class AppController(QObject):
         self._save()
 
     def set_manual_speed(self, fan_id: int, pct: int) -> None:
-        self.mode = MODE_MANUAL
-        self.active_preset_name = None
         self._command_fan_speed(fan_id, pct)
-        self.mode_changed.emit(self.mode)
-        self._save()
+        self._switch_mode(MODE_MANUAL)
 
     def apply_preset(self, preset: Preset) -> None:
-        self.mode = MODE_MANUAL
-        self.active_preset_name = preset.name
         for fan_id, pct in preset.speeds.items():
             self._command_fan_speed(fan_id, pct)
-        self.mode_changed.emit(self.mode)
-        self._save()
+        self._switch_mode(MODE_MANUAL, preset_name=preset.name)
 
     def save_current_as_preset(self, name: str, speeds: dict[int, int]) -> None:
         self.config.presets = [p for p in self.config.presets if p.name != name]
@@ -102,19 +96,13 @@ class AppController(QObject):
         self._save()
 
     def set_automatic(self) -> None:
-        self.mode = MODE_AUTOMATIC
-        self.active_preset_name = None
         self.commanded_speeds = {}  # EC takes over; we no longer know the %
         self._request_set_auto.emit()
-        self.mode_changed.emit(self.mode)
-        self._save()
+        self._switch_mode(MODE_AUTOMATIC)
 
     def set_custom_curve_mode(self) -> None:
-        self.mode = MODE_CUSTOM
-        self.active_preset_name = None
         self._rebuild_curve_controller()
-        self.mode_changed.emit(self.mode)
-        self._save()
+        self._switch_mode(MODE_CUSTOM)
 
     def set_curve_points(self, points: list[tuple[float, int]]) -> None:
         self.config.curve_points = points
@@ -123,6 +111,12 @@ class AppController(QObject):
 
     def set_start_with_windows(self, enabled: bool) -> None:
         self.config.start_with_windows = enabled
+        self._save()
+
+    def _switch_mode(self, mode: str, preset_name: str | None = None) -> None:
+        self.mode = mode
+        self.active_preset_name = preset_name
+        self.mode_changed.emit(mode)
         self._save()
 
     def _rebuild_curve_controller(self) -> None:

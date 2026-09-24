@@ -105,6 +105,23 @@ class TestCustomCurveMode:
         assert 1 not in controller.commanded_speeds
 
 
+class TestModeChangedSignal:
+    @pytest.mark.parametrize(
+        ("switch", "expected_mode"),
+        [
+            (lambda c: c.set_manual_speed(0, 50), MODE_MANUAL),
+            (lambda c: c.apply_preset(Preset(name="Desk", speeds={0: 40})), MODE_MANUAL),
+            (lambda c: c.set_automatic(), MODE_AUTOMATIC),
+            (lambda c: c.set_custom_curve_mode(), MODE_CUSTOM),
+        ],
+    )
+    def test_every_mode_switch_emits_mode_changed_once(self, controller, switch, expected_mode):
+        received = []
+        controller.mode_changed.connect(received.append)
+        switch(controller)
+        assert received == [expected_mode]
+
+
 class TestPersistence:
     def test_state_changes_are_persisted_to_config_path(self, controller, tmp_path):
         controller.set_manual_speed(0, 50)
