@@ -39,11 +39,6 @@ SELECTABLE_MODES: list[tuple[str, str]] = [
     (MODE_CUSTOM_ID, "Automatic (Override)"),
 ]
 
-# The CLI has no "get current %" reading — only RPM. In Automatic (Default),
-# where nothing is commanded by us, this is the only way to estimate a
-# percentage for display, calibrated to this hardware's confirmed max RPM.
-MAX_FAN_RPM = 6300
-
 APP_ICON_PATH = assets_dir() / "fan.png"
 
 
@@ -51,11 +46,11 @@ def app_icon() -> QIcon:
     return QIcon(str(APP_ICON_PATH))
 
 
-def estimate_pct_from_rpm(rpm: int) -> float:
+def estimate_pct_from_rpm(rpm: int, max_rpm: int) -> float:
     """Estimate a fan's speed % from RPM when no commanded % is known
     (Automatic (Default): the EC controls fans and the CLI has no
     "get current %" reading)."""
-    return min(rpm / MAX_FAN_RPM * 100, 100)
+    return min(rpm / max_rpm * 100, 100)
 
 
 def _card(widget: QWidget) -> QFrame:
@@ -181,6 +176,7 @@ class MainWindow(QMainWindow):
         self.curve_editor.curve_changed.connect(c.set_curve_points)
         self.settings_panel.start_with_windows_toggled.connect(self._on_start_with_windows_toggled)
         self.settings_panel.poll_interval_changed.connect(c.set_poll_interval)
+        self.settings_panel.max_fan_rpm_changed.connect(c.set_max_fan_rpm)
 
         self._sync_start_with_windows_checkbox()
         self.curve_editor.set_points(c.config.curve_points)
@@ -198,7 +194,8 @@ class MainWindow(QMainWindow):
         if actually_registered != self.controller.config.start_with_windows:
             self.controller.set_start_with_windows(actually_registered)
 
-        self.settings_panel.set_values(actually_registered, self.controller.config.poll_interval_ms)
+        config = self.controller.config
+        self.settings_panel.set_values(actually_registered, config.poll_interval_ms, config.max_fan_rpm)
 
     def _on_fans_ready(self, fan_count: int) -> None:
         self._rebuild_fan_gauges(fan_count)
@@ -215,7 +212,10 @@ class MainWindow(QMainWindow):
             self.sidebar.set_active(self.controller.active_preset_name)
 
     def _on_readings_updated(self, temp: int, speeds: list[int], commanded: dict[int, int]) -> None:
+        # A good reading means whatever error was showing is stale — clear it,
+        # so a transient startup failure doesn't linger as a misleading box.
         self._last_error = None
+        self._error_box.hide()
         self.temp_gauge.set_reading(temp, f"{temp}°C")
         # In Manual mode, trust the sliders directly — they're what's on
         # screen, and it means a drag shows the right % immediately instead
@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
             commanded_pct = commanded.get(fan_id)
             pct: float
             if commanded_pct is None:
-                pct = estimate_pct_from_rpm(rpm)
+                pct = estimate_pct_from_rpm(rpm, self.controller.config.max_fan_rpm)
             else:
                 pct = commanded_pct
             gauge.set_reading(pct, f"{pct:.0f}%", f"{rpm} RPM")

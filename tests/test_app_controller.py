@@ -105,6 +105,28 @@ class TestCustomCurveMode:
         assert 1 not in controller.commanded_speeds
 
 
+class TestFanCountRecovery:
+    def test_readings_recover_fan_count_when_startup_probe_failed(self, controller):
+        controller.fan_count = 0  # get_fan_count failed at startup
+        emitted = []
+        controller.fans_ready.connect(emitted.append)
+        controller._on_worker_readings(temp=40, speeds=[1000, 2000])
+        assert controller.fan_count == 2
+        assert emitted == [2]
+
+    def test_readings_do_not_re_emit_when_fan_count_is_unchanged(self, controller):
+        controller.fan_count = 2
+        emitted = []
+        controller.fans_ready.connect(emitted.append)
+        controller._on_worker_readings(temp=40, speeds=[1000, 2000])
+        assert emitted == []
+
+    def test_empty_speeds_do_not_zero_the_fan_count(self, controller):
+        controller.fan_count = 2
+        controller._on_worker_readings(temp=40, speeds=[])
+        assert controller.fan_count == 2
+
+
 class TestModeChangedSignal:
     @pytest.mark.parametrize(
         ("switch", "expected_mode"),

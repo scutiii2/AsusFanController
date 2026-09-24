@@ -99,6 +99,39 @@ class TestErrorPopup:
         window._on_error("driver missing")
         assert not window._error_box.isModal()
 
+    def test_good_reading_clears_a_stale_error_box(self, make_window):
+        window = make_window()
+        window._on_error("driver missing")
+        assert window._error_box.isVisible()
+        window._on_readings_updated(40, [1000, 1000], {})
+        assert not window._error_box.isVisible()
+
+    def test_gauges_appear_when_fan_count_recovers_from_a_failed_startup(self, make_window):
+        window = make_window()
+        # Simulate the failed-probe state: fan count 0, no fan gauges built.
+        window.controller.fan_count = 0
+        window._rebuild_fan_gauges(0)
+        assert window.fan_gauges == []
+        # A real reading arrives; the controller heals the count and the top
+        # row rebuilds with a percentage per fan.
+        window.controller._on_worker_readings(40, [1000, 2000])
+        assert len(window.fan_gauges) == 2
+        assert window.fan_gauges[0]._main_text.endswith("%")
+
+
+class TestMaxFanRpmSetting:
+    def test_settings_panel_shows_the_saved_value(self, make_window):
+        window = make_window()
+        assert window.settings_panel._max_fan_rpm.value() == window.controller.config.max_fan_rpm
+
+    def test_changing_it_saves_and_rescales_the_automatic_gauges(self, make_window):
+        window = make_window(Mode.AUTOMATIC)
+        window.settings_panel._max_fan_rpm.setValue(4000)
+        assert window.controller.config.max_fan_rpm == 4000
+        window._on_readings_updated(40, [2000, 4000], {})
+        assert window.fan_gauges[0]._main_text == "50%"
+        assert window.fan_gauges[1]._main_text == "100%"
+
 
 class TestModeSelection:
     def test_selecting_override_shows_curve_editor_and_highlights_it(self, make_window):
