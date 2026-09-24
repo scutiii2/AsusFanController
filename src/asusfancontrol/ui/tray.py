@@ -47,7 +47,7 @@ class TrayIcon(QSystemTrayIcon):
 
         menu.addSeparator()
         quit_action = menu.addAction("Quit")
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(QApplication.quit)
 
         self.setContextMenu(menu)
         self.activated.connect(self._on_activated)

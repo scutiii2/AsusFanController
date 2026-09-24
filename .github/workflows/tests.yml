@@ -19,4 +19,3 @@ jobs:
       - run: python -m pytest
       - run: ruff check .
       - run: python -m mypy
-        continue-on-error: true

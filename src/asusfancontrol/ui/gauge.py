@@ -28,31 +28,30 @@ class Gauge(QWidget):
 
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         side = min(self.width(), self.height() - 14) - 16
         rect = QRectF((self.width() - side) / 2, 4, side, side)
 
-        track_pen = QPen(QColor("#2a2f3a"), 10, Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(track_pen)
-        painter.drawArc(rect, 90 * 16, -270 * 16)
+        self._draw_arc(painter, rect, "#2a2f3a", 1.0)
+        self._draw_arc(painter, rect, ACCENT, self._fraction)
 
-        value_pen = QPen(QColor(ACCENT), 10, Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(value_pen)
-        painter.drawArc(rect, 90 * 16, int(-270 * 16 * self._fraction))
-
-        painter.setPen(QColor(TEXT))
-        painter.setFont(QFont("Segoe UI", 15, QFont.DemiBold))
-        main_rect = QRectF(rect.x(), rect.center().y() - 16, rect.width(), 20)
-        painter.drawText(main_rect, Qt.AlignCenter, self._main_text)
-
+        main_font = QFont("Segoe UI", 15, QFont.Weight.DemiBold)
+        small_font = QFont("Segoe UI", 9)
+        self._draw_text(painter, rect, rect.center().y() - 16, 20, TEXT, main_font, self._main_text)
         if self._sub_text:
-            painter.setPen(QColor(TEXT_DIM))
-            painter.setFont(QFont("Segoe UI", 9))
-            sub_rect = QRectF(rect.x(), rect.center().y() + 6, rect.width(), 16)
-            painter.drawText(sub_rect, Qt.AlignCenter, self._sub_text)
+            self._draw_text(painter, rect, rect.center().y() + 6, 16, TEXT_DIM, small_font, self._sub_text)
+        self._draw_text(painter, rect, rect.bottom() + 2, 18, TEXT_DIM, small_font, self._label)
 
-        painter.setPen(QColor(TEXT_DIM))
-        painter.setFont(QFont("Segoe UI", 9))
-        label_rect = QRectF(rect.x(), rect.bottom() + 2, rect.width(), 18)
-        painter.drawText(label_rect, Qt.AlignCenter, self._label)
+    @staticmethod
+    def _draw_arc(painter: QPainter, rect: QRectF, color: str, fraction: float) -> None:
+        painter.setPen(QPen(QColor(color), 10, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(rect, 90 * 16, int(-270 * 16 * fraction))
+
+    @staticmethod
+    def _draw_text(
+        painter: QPainter, rect: QRectF, top: float, height: float, color: str, font: QFont, text: str
+    ) -> None:
+        painter.setPen(QColor(color))
+        painter.setFont(font)
+        painter.drawText(QRectF(rect.x(), top, rect.width(), height), Qt.AlignmentFlag.AlignCenter, text)
