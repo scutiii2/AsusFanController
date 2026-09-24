@@ -57,11 +57,23 @@ is fully usable for layout/style work.
 
 ## Building the standalone .exe
 
+Double-click `build.bat`, or run it from a terminal:
+
+```bash
+build.bat
+```
+
+It creates `.venv` if missing, installs `requirements.txt`, runs the tests,
+then runs PyInstaller. Pass `--skip-tests` to skip the test run. Quit the app
+from its tray icon first: a running exe can't be overwritten.
+
+To run PyInstaller directly instead:
+
 ```bash
 .venv\Scripts\pyinstaller build.spec --noconfirm
 ```
 
-Produces `dist/AsusFanControlUI.exe` — a single-file, windowed, self-elevating
+Both produce `dist/AsusFanControlUI.exe` — a single-file, windowed, self-elevating
 executable with the CLI/driver/PsExec assets and the app icon embedded.
 
 ## Running this at Windows startup
