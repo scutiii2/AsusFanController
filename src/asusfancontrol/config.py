@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -24,6 +25,13 @@ def _parse_mode(value: object, default: Mode) -> Mode:
         return default
 
 
+def _positive_int(value: object, default: int) -> int:
+    # bool is an int subclass; true/false in the file is not a valid RPM.
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return default
+
+
 @dataclass
 class Preset:
     name: str
@@ -38,6 +46,9 @@ class AppConfig:
     last_mode: Mode = Mode.AUTOMATIC
     poll_interval_ms: int = 2000
     start_with_windows: bool = False
+    # Full-speed RPM, used to show a % in Automatic (Default) mode, where the
+    # CLI reports only RPM. 6300 is the confirmed max of the original laptop.
+    max_fan_rpm: int = 6300
 
     @staticmethod
     def default() -> AppConfig:
@@ -55,6 +66,7 @@ def save_config(path: Path, config: AppConfig) -> None:
         "last_mode": config.last_mode.value,
         "poll_interval_ms": config.poll_interval_ms,
         "start_with_windows": config.start_with_windows,
+        "max_fan_rpm": config.max_fan_rpm,
     }
     # Write beside the target, then swap it in: a crash mid-write leaves only
     # a stray temp file, never a truncated config.json that load_config would
@@ -62,6 +74,14 @@ def save_config(path: Path, config: AppConfig) -> None:
     tmp_path = path.with_name(path.name + ".tmp")
     tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     os.replace(tmp_path, path)
+
+
+def migrate_legacy_config(path: Path, legacy: Path) -> None:
+    """Copy a config from the old location once, leaving the old file as a backup."""
+    if path == legacy or path.exists() or not legacy.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(legacy, path)
 
 
 def load_config(path: Path) -> AppConfig:
@@ -94,6 +114,7 @@ def load_config(path: Path) -> AppConfig:
             last_mode=_parse_mode(data.get("last_mode"), defaults.last_mode),
             poll_interval_ms=data.get("poll_interval_ms", defaults.poll_interval_ms),
             start_with_windows=data.get("start_with_windows", defaults.start_with_windows),
+            max_fan_rpm=_positive_int(data.get("max_fan_rpm"), defaults.max_fan_rpm),
         )
     except (KeyError, TypeError, ValueError):
         return defaults

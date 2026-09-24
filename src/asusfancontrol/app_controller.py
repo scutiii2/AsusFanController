@@ -5,16 +5,15 @@ call never freezes the UI."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtCore import QObject, QThread, Signal
 
 from .config import AppConfig, Mode, Preset, load_config, save_config
 from .curve import CurveController, FanCurve
+from .paths import config_path
 from .presets import builtin_presets
 from .worker import FanWorker
 
-CONFIG_PATH = Path.home() / "AppData" / "Roaming" / "AsusFanControlUI" / "config.json"
+CONFIG_PATH = config_path()
 
 
 class AppController(QObject):
@@ -105,6 +104,10 @@ class AppController(QObject):
         self._rebuild_curve_controller()
         self._save()
 
+    def set_max_fan_rpm(self, rpm: int) -> None:
+        self.config.max_fan_rpm = rpm
+        self._save()
+
     def set_start_with_windows(self, enabled: bool) -> None:
         self.config.start_with_windows = enabled
         self._save()
@@ -124,6 +127,14 @@ class AppController(QObject):
         self.fans_ready.emit(fan_count)
 
     def _on_worker_readings(self, temp: int, speeds: list[int]) -> None:
+        # get_fan_speeds returns one RPM per fan, so len(speeds) is the true
+        # fan count. Recover it here in case the one-shot get_fan_count at
+        # startup failed (driver not ready yet right after the SYSTEM launch),
+        # which would otherwise leave fan_count at 0 and no fan gauges/presets.
+        if speeds and len(speeds) != self.fan_count:
+            self.fan_count = len(speeds)
+            self.fans_ready.emit(self.fan_count)
+
         if self.mode == Mode.CUSTOM and self._curve_controller is not None:
             target = self._curve_controller.next_speed(temp)
             if target is not None:
