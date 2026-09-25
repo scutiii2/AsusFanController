@@ -61,12 +61,6 @@ def _card(widget: QWidget) -> QFrame:
     return frame
 
 
-def _fan_label(fan_id: int, fan_count: int) -> str:
-    if fan_count == 2:
-        return "FAN 1 (CPU)" if fan_id == 0 else "FAN 2 (GPU)"
-    return f"FAN {fan_id + 1}"
-
-
 class MainWindow(QMainWindow):
     def __init__(self, controller: AppController) -> None:
         super().__init__()
@@ -150,7 +144,7 @@ class MainWindow(QMainWindow):
             wrapper.deleteLater()
         self.fan_gauges = []
         for i in range(fan_count):
-            gauge = Gauge(_fan_label(i, fan_count), 100)
+            gauge = Gauge(f"FAN {i + 1}", 100)
             self.fan_gauges.append(gauge)
             self._gauges_row.addWidget(_card(gauge))
 
