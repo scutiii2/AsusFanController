@@ -6,6 +6,9 @@ import sys
 from . import elevation
 
 
+SPLASH_MIN_SECONDS = 0.9
+
+
 def _driver_check() -> int:
     """Write a driver-diagnostics log (no GUI) and exit. Runs as SYSTEM after
     the elevation chain, so it reports what the real app sees."""
@@ -49,7 +52,7 @@ def main() -> int:
 
     import time
 
-    from PySide6.QtCore import QSharedMemory
+    from PySide6.QtCore import QSharedMemory, QTimer
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -86,12 +89,7 @@ def main() -> int:
     splash = SplashScreen()
     splash.show()
 
-    # Keep the splash's spin animation visible for a moment even if window
-    # construction below is fast enough that it would otherwise flash by.
-    deadline = time.monotonic() + 0.9
-    while time.monotonic() < deadline:
-        app.processEvents()
-        time.sleep(0.01)
+    splash_shown_at = time.monotonic()
 
     try:
         migrate_legacy_config(CONFIG_PATH, legacy_config_path())
@@ -113,8 +111,18 @@ def main() -> int:
     controller.start()
     app.aboutToQuit.connect(controller.shutdown)
 
-    splash.finish(window)
-    window.show()
+    # Keep the splash up for a minimum time even if construction above was
+    # fast enough that it would otherwise flash by. Reveal the window from the
+    # event loop (which also keeps the splash animating) instead of sleeping.
+    def reveal_window() -> None:
+        splash.finish(window)
+        window.show()
+
+    remaining_s = max(0.0, SPLASH_MIN_SECONDS - (time.monotonic() - splash_shown_at))
+    reveal_timer = QTimer(app)
+    reveal_timer.setSingleShot(True)
+    reveal_timer.timeout.connect(reveal_window)
+    reveal_timer.start(round(remaining_s * 1000))
 
     try:
         return app.exec()

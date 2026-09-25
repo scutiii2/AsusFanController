@@ -10,6 +10,7 @@ driver turns out to be.
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import Callable, TypeVar
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
@@ -107,7 +108,7 @@ class FanWorker(QObject):
     def _flush_pending_speeds(self) -> None:
         pending, self._pending_speeds = self._pending_speeds, {}
         for fan_id, pct in pending.items():
-            if self._run_safely("setting fan speed", lambda f=fan_id, p=pct: self._send_speed(f, p)):
+            if self._run_safely("setting fan speed", partial(self._send_speed, fan_id, pct)):
                 log.info("Fan %d set to %d%%", fan_id, pct)
 
     @staticmethod
