@@ -128,6 +128,8 @@ try {
     Set-Header 100 "Done"
     Write-Host ""
     Write-Host "Done: $(Join-Path $PSScriptRoot 'dist\')$ExeName" -ForegroundColor Green
+    $sha = (Get-FileHash (Join-Path $PSScriptRoot "dist\$ExeName") -Algorithm SHA256).Hash.ToLower()
+    Write-Host "SHA256: $sha"
     Read-Host "Press Enter to close"
 }
 catch {

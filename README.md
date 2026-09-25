@@ -94,12 +94,27 @@ To run PyInstaller directly instead:
 Both produce `dist/AsusFanControlUI.exe` — a single-file, windowed, self-elevating
 executable with the CLI/driver assets and the app icon embedded.
 
-To publish a release, push a version tag. The Release workflow runs the
-tests, builds the exe, and attaches it to a new GitHub Release:
+To publish a release, push a version tag. The Release workflow installs the
+fully pinned dependencies from [`requirements-lock.txt`](requirements-lock.txt),
+runs the tests, builds the exe, and attaches it plus a SHA-256 checksum file to
+a new GitHub Release:
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
+
+Regenerate `requirements-lock.txt` (instructions are in its header) whenever
+`requirements.txt` changes. Dependabot opens weekly PRs for dependency and
+GitHub Actions updates.
+
+To verify a downloaded exe against the release's `AsusFanControlUI.exe.sha256`:
+
+```powershell
+(Get-FileHash .\AsusFanControlUI.exe -Algorithm SHA256).Hash.ToLower()
+# compare with the hash in AsusFanControlUI.exe.sha256
+```
+
+The exe is not code-signed, so Windows SmartScreen may warn on first run.
 
 ## Running this at Windows startup
 
