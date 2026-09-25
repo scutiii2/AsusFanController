@@ -106,7 +106,11 @@ def load_config(path: Path) -> AppConfig:
             )
             for p in data.get("presets", [])
         ]
+        # An empty curve would crash FanCurve.interpolate in Custom mode and
+        # leave the fans unmanaged, so fall back to the default curve.
         curve_points = [(t, s) for t, s in data.get("curve_points", defaults.curve_points)]
+        if not curve_points:
+            curve_points = list(defaults.curve_points)
 
         return AppConfig(
             presets=presets,

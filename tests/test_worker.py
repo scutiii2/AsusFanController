@@ -45,6 +45,14 @@ class TestPoll:
         assert readings == []
         assert errors == [("no driver",)]
 
+    def test_failed_poll_emits_poll_failed(self, worker, monkeypatch):
+        monkeypatch.setattr(fan_control, "get_cpu_temp", _raise(FanControlError("no driver")))
+        failed = _collect(worker.poll_failed)
+
+        worker._poll()
+
+        assert failed == [()]
+
     def test_unexpected_error_is_labelled_with_the_action(self, worker, monkeypatch):
         monkeypatch.setattr(fan_control, "get_cpu_temp", lambda: 55)
         monkeypatch.setattr(fan_control, "get_fan_speeds", _raise(RuntimeError("boom")))

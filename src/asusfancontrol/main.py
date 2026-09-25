@@ -112,7 +112,12 @@ def main() -> int:
     splash.finish(window)
     window.show()
 
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        # Idempotent; covers an exception escaping the event loop, where
+        # aboutToQuit never fires, so fans are still returned to the EC.
+        controller.shutdown()
 
 
 if __name__ == "__main__":

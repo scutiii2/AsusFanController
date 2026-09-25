@@ -43,7 +43,8 @@ class CurveController:
     `max_step_down` per call rather than jumping straight to the target, so
     a sudden temp drop eases the fans down instead of snapping them from
     loud to quiet in one step. A genuine rise during that glide still
-    interrupts it and responds immediately.
+    interrupts it and responds immediately. At or above `critical_temp` the
+    fans go to 100% at once, bypassing all of the above.
     """
 
     def __init__(
@@ -53,8 +54,10 @@ class CurveController:
         hysteresis: int = 5,
         sustain_ticks: int = 2,
         max_step_down: int = 10,
+        critical_temp: float = 90,
     ) -> None:
         self.curve = curve
+        self.critical_temp = critical_temp
         self.min_floor = min_floor
         self.hysteresis = hysteresis
         self.sustain_ticks = sustain_ticks
@@ -65,6 +68,13 @@ class CurveController:
         self._easing_down = False
 
     def next_speed(self, temp: float) -> int | None:
+        # Thermal safety override: at or above critical_temp go to full speed
+        # immediately, whatever the user's curve says and regardless of
+        # hysteresis. A curve edited (or misconfigured) to stay quiet must not
+        # let the CPU cook.
+        if temp >= self.critical_temp:
+            return None if self._last_applied == 100 else self._commit(100)
+
         target = max(self.curve.interpolate(temp), self.min_floor)
 
         if self._last_applied is None:

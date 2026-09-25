@@ -177,3 +177,11 @@ class TestConfigLoadFallback:
         path.write_text(json.dumps({"presets": [{"name": "Broken"}]}), encoding="utf-8")
         loaded = load_config(path)
         assert loaded == AppConfig.default()
+
+
+def test_empty_curve_points_fall_back_to_default(tmp_path):
+    from asusfancontrol.config import AppConfig, load_config
+
+    path = tmp_path / "config.json"
+    path.write_text('{"curve_points": []}', encoding="utf-8")
+    assert load_config(path).curve_points == AppConfig.default().curve_points

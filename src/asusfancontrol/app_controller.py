@@ -8,12 +8,17 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, QThread, Signal
 
 from .config import AppConfig, Mode, Preset, load_config, save_config
+from . import fan_control
 from .curve import CurveController, FanCurve
 from .paths import config_path
 from .presets import builtin_presets
 from .worker import FanWorker
 
 CONFIG_PATH = config_path()
+
+# In Custom mode the curve is only as good as the temperature feeding it. After
+# this many failed polls in a row, stop trusting the last commanded speed.
+MAX_CONSECUTIVE_POLL_FAILURES = 3
 
 
 class AppController(QObject):
@@ -41,6 +46,8 @@ class AppController(QObject):
         # Empty/missing entries mean "unknown" (e.g. Automatic (Default),
         # where the EC controls fans and we never send a %).
         self.commanded_speeds: dict[int, int] = {}
+        self._consecutive_poll_failures = 0
+        self._shut_down = False
 
         self._thread = QThread(self)
         self._worker = FanWorker()
@@ -49,6 +56,7 @@ class AppController(QObject):
         self._worker.readings_ready.connect(self._on_worker_readings)
         self._worker.fan_count_ready.connect(self._on_worker_fan_count)
         self._worker.error.connect(self.error_occurred)
+        self._worker.poll_failed.connect(self._on_worker_poll_failed)
 
         self._request_start.connect(self._worker.start)
         self._request_set_interval.connect(self._worker.set_interval)
@@ -61,8 +69,20 @@ class AppController(QObject):
         self._request_start.emit(self.config.poll_interval_ms)
 
     def shutdown(self) -> None:
+        if self._shut_down:
+            return
+        self._shut_down = True
         self._thread.quit()
         self._thread.wait(3000)
+        # Hand the fans back to the EC. Otherwise quitting (or crashing) in
+        # Custom/Manual mode leaves them pinned at the last commanded speed,
+        # with nothing left to react to rising temps. Done directly rather than
+        # through the worker: its event loop is already stopped.
+        if self.mode != Mode.AUTOMATIC:
+            try:
+                fan_control.set_auto()
+            except Exception:  # noqa: BLE001 - best effort while exiting
+                pass
 
     def all_presets(self) -> list[Preset]:
         return builtin_presets(self.fan_count) + [p for p in self.config.presets if not p.builtin]
@@ -126,7 +146,20 @@ class AppController(QObject):
         self.fan_count = fan_count
         self.fans_ready.emit(fan_count)
 
+    def _on_worker_poll_failed(self) -> None:
+        self._consecutive_poll_failures += 1
+        if self.mode != Mode.CUSTOM or self._consecutive_poll_failures < MAX_CONSECUTIVE_POLL_FAILURES:
+            return
+        # Blind: the curve can't react to temperature. Fall back to the EC's
+        # own control rather than leave fans at a possibly-too-low speed.
+        self._consecutive_poll_failures = 0
+        self.set_automatic()
+        self.error_occurred.emit(
+            "Temperature readings keep failing; switched to Automatic (Default) so the fans stay under EC control."
+        )
+
     def _on_worker_readings(self, temp: int, speeds: list[int]) -> None:
+        self._consecutive_poll_failures = 0
         # get_fan_speeds returns one RPM per fan, so len(speeds) is the true
         # fan count. Recover it here in case the one-shot get_fan_count at
         # startup failed (driver not ready yet right after the SYSTEM launch),

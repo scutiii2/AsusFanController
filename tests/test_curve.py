@@ -127,3 +127,22 @@ class TestCurveControllerEasingDown:
         assert controller.next_speed(50) == 70  # still easing
         # temp jumps back up mid-glide: respond immediately, don't keep easing
         assert controller.next_speed(70) == 90
+
+
+class TestCriticalTemp:
+    def test_at_critical_temp_goes_to_full_speed_despite_quiet_curve(self):
+        curve = FanCurve([(30, 20), (100, 20)])
+        controller = CurveController(curve, critical_temp=90)
+        assert controller.next_speed(50) == 20
+        assert controller.next_speed(90) == 100
+
+    def test_critical_bypasses_hysteresis_and_repeats_as_none(self):
+        curve = FanCurve([(30, 20), (100, 20)])
+        controller = CurveController(curve, critical_temp=90)
+        assert controller.next_speed(95) == 100
+        assert controller.next_speed(96) is None
+
+    def test_below_critical_uses_normal_curve(self):
+        curve = FanCurve([(30, 20), (100, 20)])
+        controller = CurveController(curve, critical_temp=90)
+        assert controller.next_speed(89) == 20

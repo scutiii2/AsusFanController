@@ -154,3 +154,53 @@ class TestPersistence:
         controller.set_start_with_windows(True)
         saved = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
         assert saved["start_with_windows"] is True
+
+
+class TestFailSafe:
+    def test_repeated_poll_failures_in_custom_mode_fall_back_to_automatic(self, controller):
+        controller.set_custom_curve_mode()
+        errors = []
+        controller.error_occurred.connect(errors.append)
+        for _ in range(3):
+            controller._on_worker_poll_failed()
+        assert controller.mode == Mode.AUTOMATIC
+        assert len(errors) == 1
+
+    def test_a_good_reading_resets_the_failure_count(self, controller):
+        controller.set_custom_curve_mode()
+        controller._on_worker_poll_failed()
+        controller._on_worker_poll_failed()
+        controller._on_worker_readings(temp=40, speeds=[1000, 1000])
+        controller._on_worker_poll_failed()
+        assert controller.mode == Mode.CUSTOM
+
+    def test_poll_failures_in_manual_mode_do_not_change_mode(self, controller):
+        controller.set_manual_speed(0, 50)
+        for _ in range(5):
+            controller._on_worker_poll_failed()
+        assert controller.mode == Mode.MANUAL
+
+
+class TestShutdownRestoresAuto:
+    @pytest.mark.parametrize("mode", [Mode.CUSTOM, Mode.MANUAL])
+    def test_shutdown_returns_fans_to_ec_when_not_automatic(self, controller, monkeypatch, mode):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_auto", lambda: calls.append(1))
+        controller.mode = mode
+        controller.shutdown()
+        assert calls == [1]
+
+    def test_shutdown_in_automatic_mode_sends_nothing(self, controller, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_auto", lambda: calls.append(1))
+        controller.mode = Mode.AUTOMATIC
+        controller.shutdown()
+        assert calls == []
+
+    def test_shutdown_is_idempotent(self, controller, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_auto", lambda: calls.append(1))
+        controller.mode = Mode.CUSTOM
+        controller.shutdown()
+        controller.shutdown()
+        assert calls == [1]

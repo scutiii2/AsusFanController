@@ -22,6 +22,7 @@ class FanWorker(QObject):
     readings_ready = Signal(int, list)
     fan_count_ready = Signal(int)
     error = Signal(str)
+    poll_failed = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -71,7 +72,9 @@ class FanWorker(QObject):
         readings = self._run_safely(
             "polling", lambda: (fan_control.get_cpu_temp(), fan_control.get_fan_speeds())
         )
-        if readings is not None:
+        if readings is None:
+            self.poll_failed.emit()
+        else:
             self.readings_ready.emit(*readings)
 
     @Slot(int, int)
