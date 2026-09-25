@@ -1,7 +1,7 @@
 """Model/controller layer: wires config + curve + the background fan worker
-together. Independent of any specific widget. All actual AsusFanControl.exe
-calls happen on a worker thread (see worker.py) so a slow/AV-scanned CLI
-call never freezes the UI."""
+together. Independent of any specific widget. All fan-driver calls
+happen on a worker thread (see worker.py) so a slow driver call never
+freezes the UI."""
 
 from __future__ import annotations
 

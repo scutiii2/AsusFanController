@@ -5,15 +5,16 @@ live temp/RPM gauges, built-in and custom presets, a software fan curve
 ("Automatic (Override)"), and a system tray.
 
 Built on top of [Karmel0x/AsusFanControl](https://github.com/Karmel0x/AsusFanControl) —
-this project wraps its `AsusFanControl.exe` CLI with this UI, elevation flow,
-presets, and curve logic. That CLI is bundled as-is in
-[`src/asusfancontrol/assets`](src/asusfancontrol/assets); none of that project's
-code was modified. Licenses and owners are listed in
+this project adds a UI, elevation flow, presets, and curve logic on top of the
+same driver calls that project's `AsusFanControl.exe` CLI makes. The app calls
+ASUS's `AsusWinIO64.dll` directly (no subprocess per reading); the CLI is still
+bundled unmodified in [`src/asusfancontrol/assets`](src/asusfancontrol/assets).
+Licenses and owners are listed in
 [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt).
 
-The CLI needs ASUS's `AsusWinIO64.dll`, which is not redistributable, so it is
-not bundled: the app copies it from the local ASUS driver store (installed by
-MyASUS) at startup — see [`fan_control.py`](src/asusfancontrol/fan_control.py).
+`AsusWinIO64.dll` is not redistributable, so it is not bundled: the app copies
+it from the local ASUS driver store (installed by MyASUS) at startup — see
+[`fan_control.py`](src/asusfancontrol/fan_control.py).
 
 To reach SYSTEM (which the fan driver requires), the app duplicates a SYSTEM
 process token itself rather than shipping PsExec — see
@@ -148,14 +149,14 @@ Unregister-ScheduledTask -TaskName "_ZAsusFanController" -Confirm:$false
 src/asusfancontrol/
   assets/          bundled AsusFanControl.exe and icon (AsusWinIO64.dll copied here at runtime)
   ui/              PySide6 widgets (sidebar, gauges, graph, curve editor, tray, splash)
-  fan_control.py   the only module that shells out to AsusFanControl.exe
+  fan_control.py   the only module that talks to the fan driver (AsusWinIO64.dll via ctypes)
   worker.py        background thread that owns all fan I/O, so the UI never blocks
   app_controller.py  mode/preset/curve state, wired to the UI via Qt signals
   elevation.py     UAC -> SYSTEM self-elevation, mirroring the original FanController.bat
   autostart.py     Task Scheduler registration for "Start with Windows"
   config.py        JSON persistence (%ProgramData%\AsusFanControlUI\config.json;
                    %APPDATA%\... when ASUSFANCONTROL_SKIP_ELEVATION=1)
-tests/             unit tests for curve math, config persistence, CLI-output parsing
+tests/             unit tests for curve math, config persistence, fan-driver call sequences (against a fake library)
 docs/superpowers/specs/  design notes from planning this project
 add_startup_task.bat     registers the _ZAsusFanController startup task
 remove_startup_task.bat  removes it

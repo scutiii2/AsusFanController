@@ -1,10 +1,10 @@
-"""Runs all AsusFanControl.exe subprocess calls on a background thread.
+"""Runs all fan-driver calls on a background thread.
 
-Every call to the CLI is a fresh process spawn that touches the EC driver,
-which can be slow (driver load overhead, antivirus scanning the exe). Doing
-this on the Qt GUI thread freezes the whole UI for the duration of each
-call. This worker is moved to its own QThread by AppController so reads and
-writes never block the UI, however slow the CLI turns out to be.
+Reads and writes go through the EC driver, which can stall (driver load,
+antivirus scanning, a busy EC). Doing that on the Qt GUI thread would freeze the
+whole UI for the duration of each call. This worker is moved to its own QThread
+by AppController so reads and writes never block the UI, however slow the
+driver turns out to be.
 """
 
 from __future__ import annotations
