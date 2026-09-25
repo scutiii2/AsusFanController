@@ -33,8 +33,8 @@ class FanWorker(QObject):
         super().__init__()
         self._interval_ms = 2000
         # Latest requested % per fan, not yet sent. A slider drag queues one
-        # request per tick; each is a process spawn, so writing them all would
-        # back up behind the slow CLI. Only the newest value per fan matters.
+        # request per tick; each is a driver write, so writing them all would
+        # back up behind a slow driver. Only the newest value per fan matters.
         self._pending_speeds: dict[int, int] = {}
         # Owned timers (children of this worker, so they live and die on its
         # thread) rather than QTimer.singleShot with no context object.
@@ -65,8 +65,8 @@ class FanWorker(QObject):
         # Self-rescheduling instead of a repeating QTimer: each poll only
         # queues the NEXT one after it finishes. A repeating QTimer would
         # keep firing every interval_ms regardless of how long a poll takes
-        # (each poll shells out to a CLI that can be slow — driver overhead,
-        # antivirus scanning), building an ever-growing backlog of queued,
+        # (each poll calls into a driver that can be slow — driver overhead,
+        # a busy EC), building an ever-growing backlog of queued,
         # increasingly stale invocations on this thread's event loop —
         # including any set_fan_speed request queued behind that backlog,
         # so a user's slider change could take a long time to even reach
@@ -76,7 +76,7 @@ class FanWorker(QObject):
 
     def _run_safely(self, action: str, fn: Callable[[], T]) -> T | None:
         """Run fn, reporting any failure through `error` instead of raising,
-        so one bad CLI call never kills this thread's event loop."""
+        so one bad driver call never kills this thread's event loop."""
         try:
             return fn()
         except FanControlError as exc:

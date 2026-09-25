@@ -7,9 +7,8 @@ live temp/RPM gauges, built-in and custom presets, a software fan curve
 Built on top of [Karmel0x/AsusFanControl](https://github.com/Karmel0x/AsusFanControl) —
 this project adds a UI, elevation flow, presets, and curve logic on top of the
 same driver calls that project's `AsusFanControl.exe` CLI makes. The app calls
-ASUS's `AsusWinIO64.dll` directly (no subprocess per reading); the CLI is still
-bundled unmodified in [`src/asusfancontrol/assets`](src/asusfancontrol/assets).
-Licenses and owners are listed in
+ASUS's `AsusWinIO64.dll` directly (no subprocess per reading) and does not
+bundle or run that CLI. Credits and notices are in
 [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt).
 
 `AsusWinIO64.dll` is not redistributable, so it is not bundled: the app copies
@@ -92,7 +91,7 @@ To run PyInstaller directly instead:
 ```
 
 Both produce `dist/AsusFanControlUI.exe` — a single-file, windowed, self-elevating
-executable with the CLI/driver assets and the app icon embedded.
+executable with the app icon embedded.
 
 To publish a release, push a version tag. The Release workflow installs the
 fully pinned dependencies from [`requirements-lock.txt`](requirements-lock.txt),
@@ -162,7 +161,7 @@ Unregister-ScheduledTask -TaskName "_ZAsusFanController" -Confirm:$false
 
 ```
 src/asusfancontrol/
-  assets/          bundled AsusFanControl.exe and icon (AsusWinIO64.dll copied here at runtime)
+  assets/          app icon (AsusWinIO64.dll copied here at runtime)
   ui/              PySide6 widgets (sidebar, gauges, graph, curve editor, tray, splash)
   fan_control.py   the only module that talks to the fan driver (AsusWinIO64.dll via ctypes)
   worker.py        background thread that owns all fan I/O, so the UI never blocks

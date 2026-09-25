@@ -10,7 +10,7 @@ from asusfancontrol.config import Mode, Preset
 
 @pytest.fixture
 def controller(qtbot, monkeypatch, tmp_path):
-    # Never let the worker thread reach the real CLI, regardless of when its
+    # Never let the worker thread reach the real driver, regardless of when its
     # event loop happens to deliver a queued cross-thread signal.
     monkeypatch.setattr(fan_control, "get_fan_count", lambda: 2)
     monkeypatch.setattr(fan_control, "get_cpu_temp", lambda: 40)

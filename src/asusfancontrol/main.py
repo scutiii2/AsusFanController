@@ -93,9 +93,9 @@ def main() -> int:
     except OSError:
         pass  # a failed copy just means starting from defaults, as before
 
-    # Put AsusWinIO64.dll beside the CLI before the worker makes its first
-    # call. A missing driver library is a clear, actionable message rather
-    # than an opaque CLI failure on every poll.
+    # Put AsusWinIO64.dll in the assets folder before the worker makes its
+    # first call. A missing driver library is a clear, actionable message
+    # rather than an opaque load failure on every poll.
     from . import fan_control
 
     try:

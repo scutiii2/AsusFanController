@@ -2,7 +2,7 @@
 
 A UAC prompt reaches Administrator, then the app relaunches itself as SYSTEM,
 since the EC driver needs SYSTEM and Administrator alone is not enough: run
-from an elevated Administrator shell, the CLI still returns fan count -1 /
+from an elevated Administrator shell, the driver still returns fan count -1 /
 temp 0, the same as unelevated.
 
 SYSTEM is reached by duplicating a SYSTEM process token (system_launch), the

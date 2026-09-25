@@ -1,5 +1,5 @@
-# PyInstaller spec: standalone windowed exe with the AsusFanControl CLI,
-# EC driver DLL, and PsExec bundled as data files.
+# PyInstaller spec: standalone windowed exe with the app icon bundled as a
+# data file. The EC driver DLL is not bundled (see below).
 # Build with: pyinstaller build.spec
 
 block_cipher = None
@@ -9,7 +9,6 @@ a = Analysis(
     pathex=["src"],
     binaries=[],
     datas=[
-        ("src/asusfancontrol/assets/AsusFanControl.exe", "asusfancontrol/assets"),
         # AsusWinIO64.dll is not bundled (ASUS-owned); it is copied from the
         # driver store at startup by fan_control.ensure_driver_library().
         ("src/asusfancontrol/assets/fan.png", "asusfancontrol/assets"),

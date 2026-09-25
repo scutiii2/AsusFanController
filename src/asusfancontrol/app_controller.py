@@ -45,7 +45,7 @@ class AppController(QObject):
         self.active_preset_name: str | None = None
         self._curve_controller: CurveController | None = None
         self._rebuild_curve_controller()
-        # The CLI has no "get current %" reading, only RPM — so the only
+        # The driver has no "get current %" reading, only RPM — so the only
         # authoritative percent we can show is one we commanded ourselves.
         # Empty/missing entries mean "unknown" (e.g. Automatic (Default),
         # where the EC controls fans and we never send a %).

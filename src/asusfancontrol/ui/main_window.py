@@ -48,7 +48,7 @@ def app_icon() -> QIcon:
 
 def estimate_pct_from_rpm(rpm: int, max_rpm: int) -> float:
     """Estimate a fan's speed % from RPM when no commanded % is known
-    (Automatic (Default): the EC controls fans and the CLI has no
+    (Automatic (Default): the EC controls fans and the driver has no
     "get current %" reading)."""
     return min(rpm / max_rpm * 100, 100)
 
@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
 
         # One reusable, non-blocking box. The worker reports a failure on
         # every poll, so a fresh modal box per error would pile up one every
-        # poll interval for as long as the CLI keeps failing.
+        # poll interval for as long as the driver keeps failing.
         self._error_box = QMessageBox(QMessageBox.Icon.Warning, "ASUS FAN CONTROLLER", "", parent=self)
         self._error_box.setModal(False)
         self._last_error: str | None = None

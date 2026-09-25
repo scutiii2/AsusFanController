@@ -64,7 +64,7 @@ class AppConfig:
     poll_interval_ms: int = 2000
     start_with_windows: bool = False
     # Full-speed RPM, used to show a % in Automatic (Default) mode, where the
-    # CLI reports only RPM. 6300 is the confirmed max of the original laptop.
+    # driver reports only RPM. 6300 is the confirmed max of the original laptop.
     max_fan_rpm: int = 6300
 
     @staticmethod
@@ -134,7 +134,7 @@ def load_config(path: Path) -> AppConfig:
             curve_points=curve_points,
             last_mode=_parse_mode(data.get("last_mode"), defaults.last_mode),
             # Bounds match the settings spinbox. 0 or a negative value would
-            # otherwise spin the worker, spawning the CLI back to back.
+            # otherwise spin the worker, hammering the driver back to back.
             poll_interval_ms=_clamped_int(
                 data.get("poll_interval_ms"), defaults.poll_interval_ms, MIN_POLL_INTERVAL_MS, MAX_POLL_INTERVAL_MS
             ),

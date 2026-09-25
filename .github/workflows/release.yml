@@ -27,7 +27,7 @@ jobs:
         run: |
           $hash = (Get-FileHash dist/AsusFanControlUI.exe -Algorithm SHA256).Hash.ToLower()
           Set-Content -Path dist/AsusFanControlUI.exe.sha256 -Value "$hash *AsusFanControlUI.exe" -Encoding ascii
-      # The notices file must ship with the exe: MIT requires the upstream notice in every copy.
+      # Ship the notices file with the exe: it credits upstream and documents the ASUS DLL the app loads at runtime.
       - run: gh release create "${{ github.ref_name }}" dist/AsusFanControlUI.exe dist/AsusFanControlUI.exe.sha256 THIRD_PARTY_NOTICES.txt --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
