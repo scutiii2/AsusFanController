@@ -38,6 +38,26 @@ class TestManualMode:
         assert controller.active_preset_name is None
 
 
+class TestManualDrag:
+    def test_repeated_slider_ticks_signal_and_save_only_once(self, controller, monkeypatch):
+        saves = []
+        monkeypatch.setattr(app_controller_module, "save_config", lambda *a: saves.append(1))
+        received = []
+        controller.mode_changed.connect(received.append)
+
+        for pct in (10, 20, 30):
+            controller.set_manual_speed(0, pct)
+
+        assert received == [Mode.MANUAL]
+        assert len(saves) == 1
+        assert controller.commanded_speeds[0] == 30
+
+    def test_slider_tick_during_preset_clears_the_preset_name(self, controller):
+        controller.apply_preset(Preset(name="Desk", speeds={0: 40}))
+        controller.set_manual_speed(0, 55)
+        assert controller.active_preset_name is None
+
+
 class TestPresets:
     def test_apply_preset_commands_every_fan_in_it_and_sets_active_name(self, controller):
         preset = Preset(name="Desk", speeds={0: 40, 1: 60}, builtin=False)

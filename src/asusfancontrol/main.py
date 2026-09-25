@@ -59,6 +59,10 @@ def main() -> int:
     from .ui.main_window import MainWindow
     from .ui.splash import SplashScreen
 
+    from .logging_setup import setup_logging
+
+    setup_logging(CONFIG_PATH.parent / "asusfancontrol.log")
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setWindowIcon(QIcon(str(assets_dir() / "fan.png")))

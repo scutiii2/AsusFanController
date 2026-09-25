@@ -185,3 +185,27 @@ def test_empty_curve_points_fall_back_to_default(tmp_path):
     path = tmp_path / "config.json"
     path.write_text('{"curve_points": []}', encoding="utf-8")
     assert load_config(path).curve_points == AppConfig.default().curve_points
+
+
+class TestValidation:
+    def _load(self, tmp_path, body):
+        from asusfancontrol.config import load_config
+
+        path = tmp_path / "config.json"
+        path.write_text(body, encoding="utf-8")
+        return load_config(path)
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [("0", 500), ("-5", 500), ("99999", 10000), ('"fast"', 2000), ("true", 2000), ("3000", 3000)],
+    )
+    def test_poll_interval_is_bounded(self, tmp_path, raw, expected):
+        assert self._load(tmp_path, f'{{"poll_interval_ms": {raw}}}').poll_interval_ms == expected
+
+    def test_preset_speeds_are_clamped_and_junk_entries_dropped(self, tmp_path):
+        body = '{"presets": [{"name": "X", "speeds": {"0": 250, "1": -3, "2": "hi", "3": 40}}]}'
+        assert self._load(tmp_path, body).presets[0].speeds == {0: 100, 1: 0, 3: 40}
+
+    def test_curve_speeds_are_clamped(self, tmp_path):
+        body = '{"curve_points": [[40, 500], [60, -1]]}'
+        assert self._load(tmp_path, body).curve_points == [(40, 100), (60, 0)]

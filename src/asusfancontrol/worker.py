@@ -9,6 +9,7 @@ writes never block the UI, however slow the CLI turns out to be.
 
 from __future__ import annotations
 
+import logging
 from typing import Callable, TypeVar
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
@@ -17,6 +18,9 @@ from . import fan_control
 from .fan_control import FanControlError
 
 T = TypeVar("T")
+
+log = logging.getLogger(__name__)
+
 
 class FanWorker(QObject):
     readings_ready = Signal(int, list)
@@ -27,6 +31,18 @@ class FanWorker(QObject):
     def __init__(self) -> None:
         super().__init__()
         self._interval_ms = 2000
+        # Latest requested % per fan, not yet sent. A slider drag queues one
+        # request per tick; each is a process spawn, so writing them all would
+        # back up behind the slow CLI. Only the newest value per fan matters.
+        self._pending_speeds: dict[int, int] = {}
+        # Owned timers (children of this worker, so they live and die on its
+        # thread) rather than QTimer.singleShot with no context object.
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setSingleShot(True)
+        self._poll_timer.timeout.connect(self._poll_and_reschedule)
+        self._flush_timer = QTimer(self)
+        self._flush_timer.setSingleShot(True)
+        self._flush_timer.timeout.connect(self._flush_pending_speeds)
 
     @Slot(int)
     def start(self, interval_ms: int) -> None:
@@ -55,7 +71,7 @@ class FanWorker(QObject):
         # so a user's slider change could take a long time to even reach
         # the hardware. This guarantees at most one poll's worth of lag.
         self._poll()
-        QTimer.singleShot(self._interval_ms, self._poll_and_reschedule)
+        self._poll_timer.start(self._interval_ms)
 
     def _run_safely(self, action: str, fn: Callable[[], T]) -> T | None:
         """Run fn, reporting any failure through `error` instead of raising,
@@ -63,8 +79,10 @@ class FanWorker(QObject):
         try:
             return fn()
         except FanControlError as exc:
+            log.error("%s", exc)
             self.error.emit(str(exc))
         except Exception as exc:  # noqa: BLE001 - keep the worker loop alive
+            log.exception("Unexpected error while %s", action)
             self.error.emit(f"Unexpected error while {action}: {exc}")
         return None
 
@@ -73,14 +91,34 @@ class FanWorker(QObject):
             "polling", lambda: (fan_control.get_cpu_temp(), fan_control.get_fan_speeds())
         )
         if readings is None:
+            log.warning("Poll failed")
             self.poll_failed.emit()
         else:
             self.readings_ready.emit(*readings)
 
     @Slot(int, int)
     def set_fan_speed(self, fan_id: int, pct: int) -> None:
-        self._run_safely("setting fan speed", lambda: fan_control.set_fan_speed(fan_id, pct))
+        """Queue a speed; the send happens once the event loop has drained
+        every request already waiting, so bursts collapse to the latest."""
+        self._pending_speeds[fan_id] = pct
+        if not self._flush_timer.isActive():
+            self._flush_timer.start(0)
+
+    def _flush_pending_speeds(self) -> None:
+        pending, self._pending_speeds = self._pending_speeds, {}
+        for fan_id, pct in pending.items():
+            if self._run_safely("setting fan speed", lambda f=fan_id, p=pct: self._send_speed(f, p)):
+                log.info("Fan %d set to %d%%", fan_id, pct)
+
+    @staticmethod
+    def _send_speed(fan_id: int, pct: int) -> bool:
+        fan_control.set_fan_speed(fan_id, pct)
+        return True
 
     @Slot()
     def set_auto(self) -> None:
+        # Anything still queued was requested before this and must not
+        # override it.
+        self._pending_speeds.clear()
         self._run_safely("setting automatic mode", fan_control.set_auto)
+        log.info("Automatic mode set")

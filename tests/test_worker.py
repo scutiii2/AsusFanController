@@ -69,6 +69,7 @@ class TestSetFanSpeed:
         monkeypatch.setattr(fan_control, "set_fan_speed", lambda fan_id, pct: calls.append((fan_id, pct)))
 
         worker.set_fan_speed(1, 70)
+        worker._flush_pending_speeds()
 
         assert calls == [(1, 70)]
 
@@ -77,6 +78,7 @@ class TestSetFanSpeed:
         errors = _collect(worker.error)
 
         worker.set_fan_speed(0, 50)
+        worker._flush_pending_speeds()
 
         assert errors == [("exit 1",)]
 
@@ -85,11 +87,51 @@ class TestSetFanSpeed:
         errors = _collect(worker.error)
 
         worker.set_fan_speed(0, 50)
+        worker._flush_pending_speeds()
 
         assert errors == [("Unexpected error while setting fan speed: denied",)]
 
+    def test_burst_of_requests_sends_only_the_latest_per_fan(self, worker, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_fan_speed", lambda fan_id, pct: calls.append((fan_id, pct)))
+
+        for pct in (10, 20, 30):
+            worker.set_fan_speed(0, pct)
+        worker.set_fan_speed(1, 80)
+        worker._flush_pending_speeds()
+
+        assert sorted(calls) == [(0, 30), (1, 80)]
+
+    def test_nothing_is_sent_before_the_flush(self, worker, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_fan_speed", lambda fan_id, pct: calls.append((fan_id, pct)))
+
+        worker.set_fan_speed(0, 50)
+
+        assert calls == []
+
+    def test_queued_speeds_are_flushed_by_the_event_loop(self, worker, qtbot, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_fan_speed", lambda fan_id, pct: calls.append((fan_id, pct)))
+
+        worker.set_fan_speed(0, 10)
+        worker.set_fan_speed(0, 40)
+
+        qtbot.waitUntil(lambda: calls == [(0, 40)], timeout=1000)
+
 
 class TestSetAuto:
+    def test_auto_discards_speeds_queued_before_it(self, worker, monkeypatch):
+        calls = []
+        monkeypatch.setattr(fan_control, "set_fan_speed", lambda fan_id, pct: calls.append((fan_id, pct)))
+        monkeypatch.setattr(fan_control, "set_auto", lambda: None)
+
+        worker.set_fan_speed(0, 20)
+        worker.set_auto()
+        worker._flush_pending_speeds()
+
+        assert calls == []
+
     def test_unexpected_error_is_labelled_with_the_action(self, worker, monkeypatch):
         monkeypatch.setattr(fan_control, "set_auto", _raise(RuntimeError("boom")))
         errors = _collect(worker.error)

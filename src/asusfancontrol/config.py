@@ -10,6 +10,10 @@ from enum import StrEnum
 from pathlib import Path
 
 
+MIN_POLL_INTERVAL_MS = 500
+MAX_POLL_INTERVAL_MS = 10000
+
+
 class Mode(StrEnum):
     AUTOMATIC = "automatic"
     CUSTOM = "custom"
@@ -30,6 +34,19 @@ def _positive_int(value: object, default: int) -> int:
     if isinstance(value, int) and not isinstance(value, bool) and value > 0:
         return value
     return default
+
+
+def _clamped_int(value: object, default: int, low: int, high: int) -> int:
+    """`value` limited to [low, high]; `default` if it isn't a real int."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return min(max(value, low), high)
+    return default
+
+
+def _valid_pct(value: object) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return min(max(value, 0), 100)
+    return None
 
 
 @dataclass
@@ -101,14 +118,14 @@ def load_config(path: Path) -> AppConfig:
         presets = [
             Preset(
                 name=p["name"],
-                speeds={int(k): v for k, v in p["speeds"].items()},
+                speeds={int(k): pct for k, v in p["speeds"].items() if (pct := _valid_pct(v)) is not None},
                 builtin=p.get("builtin", False),
             )
             for p in data.get("presets", [])
         ]
         # An empty curve would crash FanCurve.interpolate in Custom mode and
         # leave the fans unmanaged, so fall back to the default curve.
-        curve_points = [(t, s) for t, s in data.get("curve_points", defaults.curve_points)]
+        curve_points = [(t, min(max(s, 0), 100)) for t, s in data.get("curve_points", defaults.curve_points)]
         if not curve_points:
             curve_points = list(defaults.curve_points)
 
@@ -116,7 +133,11 @@ def load_config(path: Path) -> AppConfig:
             presets=presets,
             curve_points=curve_points,
             last_mode=_parse_mode(data.get("last_mode"), defaults.last_mode),
-            poll_interval_ms=data.get("poll_interval_ms", defaults.poll_interval_ms),
+            # Bounds match the settings spinbox. 0 or a negative value would
+            # otherwise spin the worker, spawning the CLI back to back.
+            poll_interval_ms=_clamped_int(
+                data.get("poll_interval_ms"), defaults.poll_interval_ms, MIN_POLL_INTERVAL_MS, MAX_POLL_INTERVAL_MS
+            ),
             start_with_windows=data.get("start_with_windows", defaults.start_with_windows),
             max_fan_rpm=_positive_int(data.get("max_fan_rpm"), defaults.max_fan_rpm),
         )

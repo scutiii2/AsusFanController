@@ -5,6 +5,8 @@ call never freezes the UI."""
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QObject, QThread, Signal
 
 from .config import AppConfig, Mode, Preset, load_config, save_config
@@ -13,6 +15,8 @@ from .curve import CurveController, FanCurve
 from .paths import config_path
 from .presets import builtin_presets
 from .worker import FanWorker
+
+log = logging.getLogger(__name__)
 
 CONFIG_PATH = config_path()
 
@@ -81,8 +85,9 @@ class AppController(QObject):
         if self.mode != Mode.AUTOMATIC:
             try:
                 fan_control.set_auto()
+                log.info("Shutdown: fans returned to EC control")
             except Exception:  # noqa: BLE001 - best effort while exiting
-                pass
+                log.exception("Shutdown: could not return fans to EC control")
 
     def all_presets(self) -> list[Preset]:
         return builtin_presets(self.fan_count) + [p for p in self.config.presets if not p.builtin]
@@ -94,6 +99,10 @@ class AppController(QObject):
 
     def set_manual_speed(self, fan_id: int, pct: int) -> None:
         self._command_fan_speed(fan_id, pct)
+        # A slider drag calls this on every tick. Only the first one changes
+        # anything; skip the mode signal and config write for the rest.
+        if self.mode == Mode.MANUAL and self.active_preset_name is None:
+            return
         self._switch_mode(Mode.MANUAL)
 
     def apply_preset(self, preset: Preset) -> None:
@@ -133,6 +142,7 @@ class AppController(QObject):
         self._save()
 
     def _switch_mode(self, mode: Mode, preset_name: str | None = None) -> None:
+        log.info("Mode: %s%s", mode.value, f" (preset {preset_name!r})" if preset_name else "")
         self.mode = mode
         self.active_preset_name = preset_name
         self.mode_changed.emit(mode)
@@ -153,6 +163,7 @@ class AppController(QObject):
         # Blind: the curve can't react to temperature. Fall back to the EC's
         # own control rather than leave fans at a possibly-too-low speed.
         self._consecutive_poll_failures = 0
+        log.warning("Temperature readings failing in Custom mode; falling back to Automatic")
         self.set_automatic()
         self.error_occurred.emit(
             "Temperature readings keep failing; switched to Automatic (Default) so the fans stay under EC control."
@@ -171,6 +182,8 @@ class AppController(QObject):
         if self.mode == Mode.CUSTOM and self._curve_controller is not None:
             target = self._curve_controller.next_speed(temp)
             if target is not None:
+                if temp >= self._curve_controller.critical_temp:
+                    log.warning("Critical temperature %d C: fans forced to 100%%", temp)
                 for fan_id in range(self.fan_count):
                     self._command_fan_speed(fan_id, target)
 
