@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFormLayout, QLabel, QSlider, QWidget
+from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QSlider, QWidget
 
 from .qt_utils import block_signals
 
@@ -25,7 +25,6 @@ class ManualPanel(QWidget):
 
         for fan_id in range(fan_count):
             row = QWidget()
-            from PySide6.QtWidgets import QHBoxLayout
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
 

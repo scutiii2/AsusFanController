@@ -42,15 +42,25 @@ class FanControlError(Exception):
     """Raised when the driver library can't be loaded or reports a failure."""
 
 
+def driver_library_path() -> Path:
+    """Where the app loads AsusWinIO64.dll from."""
+    return assets_dir() / _DRIVER_DLL_NAME
+
+
+def driver_store_matches() -> list[str]:
+    """Copies of AsusWinIO64.dll in the ASUS driver store, if any."""
+    return sorted(glob.glob(_DRIVER_STORE_GLOB))
+
+
 def ensure_driver_library() -> None:
     """Copy AsusWinIO64.dll into the assets folder if it isn't there yet.
 
     Raises FanControlError if MyASUS isn't installed, so it can't be found.
     """
-    target = assets_dir() / _DRIVER_DLL_NAME
+    target = driver_library_path()
     if target.exists():
         return
-    matches = sorted(glob.glob(_DRIVER_STORE_GLOB))
+    matches = driver_store_matches()
     if not matches:
         raise FanControlError(
             f"{_DRIVER_DLL_NAME} not found in the driver store. Install MyASUS "
@@ -227,7 +237,7 @@ class FanController:
 
 
 def _load_default_library() -> WinIoLibrary:
-    return CtypesWinIoLibrary(assets_dir() / _DRIVER_DLL_NAME)
+    return CtypesWinIoLibrary(driver_library_path())
 
 
 _default = FanController(_load_default_library)

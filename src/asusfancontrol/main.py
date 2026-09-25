@@ -12,8 +12,6 @@ SPLASH_MIN_SECONDS = 0.9
 def _driver_check() -> int:
     """Write a driver-diagnostics log (no GUI) and exit. Runs as SYSTEM after
     the elevation chain, so it reports what the real app sees."""
-    import glob
-
     from . import fan_control
     from .paths import assets_dir, config_path
 
@@ -21,12 +19,11 @@ def _driver_check() -> int:
         f"whoami env USERNAME: {os.environ.get('USERNAME')}",
         f"frozen: {getattr(sys, 'frozen', False)}",
         f"assets_dir: {assets_dir()}",
-        f"driver store glob: {fan_control._DRIVER_STORE_GLOB}",
-        f"glob matches: {glob.glob(fan_control._DRIVER_STORE_GLOB)}",
+        f"driver store matches: {fan_control.driver_store_matches()}",
     ]
     try:
         fan_control.ensure_driver_library()
-        lines.append(f"ensure_driver_library: OK, dll at {assets_dir() / fan_control._DRIVER_DLL_NAME}")
+        lines.append(f"ensure_driver_library: OK, dll at {fan_control.driver_library_path()}")
         lines.append(f"get_fan_count: {fan_control.get_fan_count()}")
     except Exception as exc:  # noqa: BLE001 - diagnostic, report everything
         lines.append(f"ERROR: {type(exc).__name__}: {exc}")
